@@ -5,5 +5,7 @@ export const routes = route({
   changes: get('/changes/*version'),
   robots: get('/robots.txt'),
   sitemap: get('/sitemap.xml'),
-  index: get('/(*version)'),
+  version: get('/version/*version'),
+  index: get('/'),
+  notFound: get('/*path'),
 });

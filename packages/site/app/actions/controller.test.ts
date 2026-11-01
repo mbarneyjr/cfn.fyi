@@ -19,7 +19,7 @@ const index = (path: string) => router.fetch(new URL(path, 'http://localhost'));
 describe('changelog', () => {
   it('builds the hrefs', () => {
     assert.equal(routes.index.href(), '/');
-    assert.equal(routes.index.href({ version: '1.0.0' }), '/1.0.0');
+    assert.equal(routes.version.href({ version: '1.0.0' }), '/version/1.0.0');
     assert.equal(routes.changes.href({ version: '1.0.0' }), '/changes/1.0.0');
   });
 
@@ -36,22 +36,22 @@ describe('changelog', () => {
 
   it('renders a version from the path', async (t) => {
     t.mock.method(globalThis, 'fetch', storage);
-    const response = await index('/1.0.0');
+    const response = await index('/version/1.0.0');
     assert.equal(response.status, 200);
     const html = await response.text();
     assert.match(html, /<title>cfn\.fyi · CloudFormation specification version 1\.0\.0<\/title>/);
     assert.match(html, /Version 1\.0\.0<\/h1>/);
   });
 
-  it('redirects a version query to the version path', async () => {
-    const response = await index('/?version=1.0.0');
-    assert.equal(response.status, 301);
-    assert.equal(response.headers.get('Location'), '/1.0.0');
-  });
-
   it('rejects an unknown version path', async (t) => {
     t.mock.method(globalThis, 'fetch', storage);
-    const response = await index('/9.9.9');
+    const response = await index('/version/9.9.9');
+    assert.equal(response.status, 404);
+    assert.match(await response.text(), /<title>cfn\.fyi · Not found<\/title>/);
+  });
+
+  it('rejects an unknown path', async () => {
+    const response = await index('/1.0.0');
     assert.equal(response.status, 404);
     assert.match(await response.text(), /<title>cfn\.fyi · Not found<\/title>/);
   });
@@ -67,9 +67,9 @@ describe('changelog', () => {
     const response = await index(routes.sitemap.href());
     assert.equal(response.status, 200);
     const xml = await response.text();
-    assert.match(xml, /<loc>https:\/\/cfn\.fyi\/1\.0\.0<\/loc>/);
+    assert.match(xml, /<loc>https:\/\/cfn\.fyi\/version\/1\.0\.0<\/loc>/);
     assert.match(xml, /<loc>https:\/\/cfn\.fyi\/<\/loc>/);
-    assert.doesNotMatch(xml, /<loc>https:\/\/cfn\.fyi\/2\.0\.0<\/loc>/);
+    assert.doesNotMatch(xml, /<loc>https:\/\/cfn\.fyi\/version\/2\.0\.0<\/loc>/);
   });
 
   it('rejects an unknown version', async (t) => {

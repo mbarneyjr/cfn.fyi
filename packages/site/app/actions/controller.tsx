@@ -1,7 +1,7 @@
-import { redirect } from 'remix/response/redirect';
 import { createController } from 'remix/router';
 
 import { assets } from '#app/assets.ts';
+import type { AppContext } from '#app/router.ts';
 import { routes } from '#app/routes.ts';
 import { ChangelogChanges } from '#app/ui/pages/changelog/changes.tsx';
 import { compare } from '#app/ui/pages/changelog/comparison.ts';
@@ -16,6 +16,32 @@ const document = (body: string, type: string, maxAge: number) =>
   new Response(body, {
     headers: { 'Content-Type': `${type}; charset=utf-8`, 'Cache-Control': `public, max-age=0, s-maxage=${maxAge}` },
   });
+
+const pageHeaders = { 'Cache-Control': 'public, max-age=0, s-maxage=300' };
+
+const notFound = (context: AppContext) =>
+  context.render(<NotFoundPage path={context.url.pathname} />, { status: 404, headers: pageHeaders });
+
+async function changelog(context: AppContext, path?: string) {
+  const versions = await listCfnVersions();
+  const version = path ?? (versions.at(-1) as string);
+  const index = versions.indexOf(version);
+  if (index < 0) return notFound(context);
+  const [previous, current, next] = await Promise.all(
+    [versions[index - 1], version, versions[index + 1]].map(neighbor),
+  );
+  return context.render(
+    <ChangelogPage
+      home={!path}
+      versions={versions}
+      version={version}
+      date={current?.date}
+      previous={previous}
+      next={next}
+    />,
+    { headers: pageHeaders },
+  );
+}
 
 export default createController(routes, {
   actions: {
@@ -33,7 +59,7 @@ export default createController(routes, {
         ...versions
           .slice(0, -1)
           .toReversed()
-          .map((version) => routes.index.href({ version })),
+          .map((version) => routes.version.href({ version })),
       ];
       const body = [
         '<?xml version="1.0" encoding="UTF-8"?>',
@@ -43,31 +69,13 @@ export default createController(routes, {
       ].join('\n');
       return document(body, 'application/xml', 3600);
     },
-    async index(context) {
-      const headers = { 'Cache-Control': 'public, max-age=0, s-maxage=300' };
-      const query = context.url.searchParams.get('version');
-      if (query) return redirect(routes.index.href({ version: query }), { status: 301, headers });
-      const versions = await listCfnVersions();
-      const version = context.params.version ?? (versions.at(-1) as string);
-      if (!versions.includes(version)) {
-        return context.render(<NotFoundPage path={context.url.pathname} />, { status: 404, headers });
-      }
-      const index = versions.indexOf(version);
-      const [previous, current, next] = await Promise.all(
-        [versions[index - 1], version, versions[index + 1]].map(neighbor),
-      );
-      return context.render(
-        <ChangelogPage
-          home={!context.params.version}
-          versions={versions}
-          version={version}
-          date={current?.date}
-          previous={previous}
-          next={next}
-        />,
-        { headers },
-      );
+    index(context) {
+      return changelog(context);
     },
+    version(context) {
+      return changelog(context, context.params.version);
+    },
+    notFound,
     async changes(context) {
       const { version } = context.params;
       try {

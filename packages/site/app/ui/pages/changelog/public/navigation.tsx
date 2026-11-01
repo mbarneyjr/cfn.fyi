@@ -22,8 +22,6 @@ const titleBlock = css({
 
 const area = (name: string) => css({ gridArea: name });
 
-const contents = css({ display: 'contents' });
-
 const dateSlot = css({ minBlockSize: '1lh' });
 
 const select = css({
@@ -73,7 +71,7 @@ export const ChangelogNavigation = clientEntry(
         }
         return (
           <a
-            href={routes.index.href({ version: neighbor.version })}
+            href={routes.version.href({ version: neighbor.version })}
             rel={direction === 'previous' ? 'prev' : 'next'}
             mix={[
               area(direction),
@@ -97,41 +95,35 @@ export const ChangelogNavigation = clientEntry(
       return (
         <nav aria-label="Specification versions" mix={[layout.cells, titleBlock]}>
           {link('previous', previous)}
-          <form method="get" action={routes.index.href()} mix={contents}>
-            <label
+          <label
+            mix={[
+              area('version'),
+              color.paper,
+              layout.stack,
+              space.gap1,
+              space.padBlock2,
+              space.padInline3,
+              text.alignCenter,
+            ]}
+          >
+            <span mix={[text.label, color.brand]}>Version</span>
+            <select
               mix={[
-                area('version'),
-                color.paper,
-                layout.stack,
-                space.gap1,
-                space.padBlock2,
-                space.padInline3,
-                text.alignCenter,
+                select,
+                text.tabular,
+                on('change', (event) => location.assign(routes.version.href({ version: event.currentTarget.value }))),
               ]}
             >
-              <span mix={[text.label, color.brand]}>Version</span>
-              <select
-                name="version"
-                mix={[
-                  select,
-                  text.tabular,
-                  on('change', (event) => location.assign(routes.index.href({ version: event.currentTarget.value }))),
-                ]}
-              >
-                {versions.toReversed().map((value) => (
-                  <option key={value} value={value} selected={value === version}>
-                    {value}
-                  </option>
-                ))}
-              </select>
-              <time datetime={date} mix={[text.small, text.tabular, color.muted, dateSlot]}>
-                {date && `issued ${date}`}
-              </time>
-            </label>
-            <noscript>
-              <button type="submit">show</button>
-            </noscript>
-          </form>
+              {versions.toReversed().map((value) => (
+                <option key={value} value={value} selected={value === version}>
+                  {value}
+                </option>
+              ))}
+            </select>
+            <time datetime={date} mix={[text.small, text.tabular, color.muted, dateSlot]}>
+              {date && `issued ${date}`}
+            </time>
+          </label>
           {link('next', next)}
         </nav>
       );

@@ -6,7 +6,7 @@ import { assets } from './assets.ts';
 import { routes } from './routes.ts';
 
 const renderMiddleware = render({ assets });
-type AppContext = MiddlewareContext<[typeof renderMiddleware]>;
+export type AppContext = MiddlewareContext<[typeof renderMiddleware]>;
 
 declare module 'remix' {
   interface RouterTypes {

@@ -36,7 +36,7 @@ export function ChangelogPage(handle: Handle<ChangelogPageProps>) {
       <Document
         title={title}
         description={description}
-        path={home || version === navigation.versions.at(-1) ? routes.index.href() : routes.index.href({ version })}
+        path={home || version === navigation.versions.at(-1) ? routes.index.href() : routes.version.href({ version })}
         page={{ headline: title, description, datePublished: date }}
       >
         <div mix={[layout.stack, space.gap4]}>
