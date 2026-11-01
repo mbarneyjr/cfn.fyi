@@ -1,12 +1,16 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="3 3 26 26">
   <style>
-    .paper { fill: #f7f9fc; }
-    .mark { fill: #d6e3f8; stroke: #0c49c0; }
+    .square { fill: none; stroke: hsl(213 38% 80%); }
+    .overlap { fill: hsl(216 88% 40% / 0.12); stroke: hsl(216 88% 40%); }
+    .tilde { fill: none; stroke: hsl(216 88% 40%); }
     @media (prefers-color-scheme: dark) {
-      .paper { fill: #0e2035; }
-      .mark { fill: #1c3e5c; stroke: #5ccdfa; }
+      .square { stroke: hsl(212 42% 30%); }
+      .overlap { fill: hsl(197 95% 68% / 0.12); stroke: hsl(197 95% 68%); }
+      .tilde { stroke: hsl(197 95% 68%); }
     }
   </style>
-  <rect class="paper" width="32" height="32" />
-  <path class="mark" d="M16 5 28 27H4Z" stroke-width="3" stroke-linejoin="miter" />
+  <rect class="square" x="4" y="4" width="18" height="18" stroke-width="2" />
+  <rect class="square" x="10" y="10" width="18" height="18" stroke-width="2" />
+  <rect class="overlap" x="10" y="10" width="12" height="12" stroke-width="2" />
+  <path class="tilde" d="M12.5 16.6C14 15.2 15 15.2 16 16S18 16.8 19.5 15.4" stroke-width="2" stroke-linecap="square" />
 </svg>
