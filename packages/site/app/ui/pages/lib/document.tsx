@@ -22,6 +22,8 @@ const resetCssHref = await assets.getHref('app/ui/public/reset.css');
 const fontsCssHref = await assets.getHref('app/ui/public/fonts.css');
 const themeCssHref = await assets.getHref('app/ui/public/theme.css');
 const faviconHref = await assets.getHref('app/ui/public/favicon.svg');
+const ogImageHref = await assets.getHref('app/ui/public/og.png');
+const appleTouchIconHref = await assets.getHref('app/ui/public/apple-touch-icon.png');
 const fontHrefs = await Promise.all(
   ['Regular', 'Bold', 'Italic'].map((style) => assets.getHref(`app/ui/public/fonts/IoskeleyMono-${style}.woff2`)),
 );
@@ -62,10 +64,18 @@ export function Document(handle: Handle<DocumentProps>) {
           <meta property="og:url" content={`${origin}${path}`} />
           <meta property="og:title" content={title} />
           <meta property="og:description" content={description} />
-          <meta name="twitter:card" content="summary" />
+          <meta property="og:image" content={`${origin}${ogImageHref}`} />
+          <meta property="og:image:type" content="image/png" />
+          <meta property="og:image:width" content="1200" />
+          <meta property="og:image:height" content="630" />
+          <meta property="og:image:alt" content="cfn.fyi, CloudFormation Changelog" />
+          <meta name="twitter:card" content="summary_large_image" />
+          <meta name="twitter:image" content={`${origin}${ogImageHref}`} />
+          <meta name="twitter:image:alt" content="cfn.fyi, CloudFormation Changelog" />
           <meta name="twitter:site" content="@mbarneyjr" />
           <meta name="twitter:creator" content="@mbarneyjr" />
           <link rel="icon" type="image/svg+xml" href={faviconHref} />
+          <link rel="apple-touch-icon" href={appleTouchIconHref} />
           <script type="application/ld+json">{JSON.stringify(structuredData)}</script>
           <ImportMap value={importMap} />
           {preloads.map((preloadHref) => (
