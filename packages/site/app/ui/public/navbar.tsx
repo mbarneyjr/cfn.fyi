@@ -12,8 +12,6 @@ const mark = css({
   strokeLinejoin: 'miter',
 });
 
-const descriptor = css({ '@media (max-width: 640px)': { display: 'none' } });
-
 export function DeltaMark(_handle: Handle) {
   return () => (
     <svg viewBox="0 0 24 24" aria-hidden="true" mix={mark}>
@@ -32,7 +30,6 @@ export const Navbar = clientEntry(import.meta.url, function Navbar(_handle: Hand
             cfn<span mix={color.brand}>.fyi</span>
           </span>
         </a>
-        <span mix={[descriptor, text.small, color.muted]}>CloudFormation specification changelog</span>
         <div mix={[layout.row, layout.pushEnd, space.gap2]}>
           <ThemeControl />
         </div>

@@ -32,7 +32,7 @@ const badge = css({
   lineHeight: 1,
 });
 
-function Badge(handle: Handle<{ status: Status }>) {
+export function Badge(handle: Handle<{ status: Status }>) {
   return () => {
     const mark = marks[statusMarks[handle.props.status]];
     return (
@@ -75,6 +75,12 @@ const invisible = css({ visibility: 'hidden' });
 const row = css({ cursor: 'default', listStyle: 'none', '&::-webkit-details-marker': { display: 'none' } });
 
 const summaryRow = css({ cursor: 'pointer', '&:hover': { backgroundColor: 'var(--color-sheet)' } });
+
+const entryHeader = css({
+  gap: 'var(--space-2)',
+  paddingInline: 'var(--space-3)',
+  '@media (max-width: 640px)': { paddingInline: 'var(--space-2)' },
+});
 
 const anchor = css({
   '--link-color': 'var(--color-muted)',
@@ -215,7 +221,7 @@ export function ChangelogChanges(handle: Handle<ChangelogChangesProps>) {
             </div>
             <div mix={[layout.cells, layout.stack]}>
               {group.blocks.map((block) => {
-                const header = [layout.row, space.gap2, space.padBlock2, space.padInline3, row];
+                const header = [layout.row, space.padBlock2, row, entryHeader];
                 if (block.status === 'removed') {
                   return (
                     <h3 key={block.name} id={block.id} mix={[...header, text.base, text.regular]}>

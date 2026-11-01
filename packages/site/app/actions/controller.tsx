@@ -28,7 +28,14 @@ export default createController(routes, {
         [versions[index - 1], version, versions[index + 1]].map(neighbor),
       );
       return context.render(
-        <ChangelogPage versions={versions} version={version} date={current?.date} previous={previous} next={next} />,
+        <ChangelogPage
+          home={!context.params.version}
+          versions={versions}
+          version={version}
+          date={current?.date}
+          previous={previous}
+          next={next}
+        />,
         { headers },
       );
     },

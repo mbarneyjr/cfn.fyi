@@ -30,14 +30,17 @@ describe('changelog', () => {
     assert.match(response.headers.get('content-type') ?? '', /text\/html/);
     const html = await response.text();
     assert.match(html, /<title>cfn\.fyi · CloudFormation specification changelog<\/title>/);
-    assert.match(html, /Resource specification 2\.0\.0/);
+    assert.match(html, /What changed in CloudFormation/);
+    assert.match(html, /2\.0\.0/);
   });
 
   it('renders a version from the path', async (t) => {
     t.mock.method(globalThis, 'fetch', storage);
     const response = await index('/1.0.0');
     assert.equal(response.status, 200);
-    assert.match(await response.text(), /Resource specification 1\.0\.0/);
+    const html = await response.text();
+    assert.match(html, /<title>cfn\.fyi · Version 1\.0\.0<\/title>/);
+    assert.match(html, /Version 1\.0\.0<\/h1>/);
   });
 
   it('redirects a version query to the version path', async () => {
