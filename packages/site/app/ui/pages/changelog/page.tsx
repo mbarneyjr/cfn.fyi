@@ -23,16 +23,21 @@ const legend = css({ listStyle: 'none', padding: 0, margin: 0 });
 export function ChangelogPage(handle: Handle<ChangelogPageProps>) {
   return () => {
     const { home, ...navigation } = handle.props;
-    const { version, date } = navigation;
+    const { version, date, previous } = navigation;
+    const title = home
+      ? 'cfn.fyi · CloudFormation specification changelog'
+      : `cfn.fyi · CloudFormation specification version ${version}`;
+    const description = home
+      ? 'Each version of the AWS CloudFormation resource specification, compared with the version before it.'
+      : `Resource types added, modified, and removed in version ${version} of the AWS CloudFormation resource specification${
+          date ? `, issued ${date}` : ''
+        }${previous ? `, compared with version ${previous.version}` : ''}.`;
     return (
       <Document
-        title={home ? 'cfn.fyi · CloudFormation specification changelog' : `cfn.fyi · Version ${version}`}
-        description={
-          home
-            ? 'Each version of the AWS CloudFormation resource specification, compared with the version before it.'
-            : `The changes in version ${version} of the AWS CloudFormation resource specification.`
-        }
-        path={home ? routes.index.href() : routes.index.href({ version })}
+        title={title}
+        description={description}
+        path={home || version === navigation.versions.at(-1) ? routes.index.href() : routes.index.href({ version })}
+        page={{ headline: title, description, datePublished: date }}
       >
         <div mix={[layout.stack, space.gap4]}>
           <header mix={[layout.stack, space.gap3]}>

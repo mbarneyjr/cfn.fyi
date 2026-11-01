@@ -39,7 +39,7 @@ describe('changelog', () => {
     const response = await index('/1.0.0');
     assert.equal(response.status, 200);
     const html = await response.text();
-    assert.match(html, /<title>cfn\.fyi · Version 1\.0\.0<\/title>/);
+    assert.match(html, /<title>cfn\.fyi · CloudFormation specification version 1\.0\.0<\/title>/);
     assert.match(html, /Version 1\.0\.0<\/h1>/);
   });
 
@@ -54,6 +54,22 @@ describe('changelog', () => {
     const response = await index('/9.9.9');
     assert.equal(response.status, 404);
     assert.match(await response.text(), /<title>cfn\.fyi · Not found<\/title>/);
+  });
+
+  it('serves robots.txt with the sitemap location', async () => {
+    const response = await index(routes.robots.href());
+    assert.equal(response.status, 200);
+    assert.match(await response.text(), /Sitemap: https:\/\/cfn\.fyi\/sitemap\.xml/);
+  });
+
+  it('serves a sitemap of every version', async (t) => {
+    t.mock.method(globalThis, 'fetch', storage);
+    const response = await index(routes.sitemap.href());
+    assert.equal(response.status, 200);
+    const xml = await response.text();
+    assert.match(xml, /<loc>https:\/\/cfn\.fyi\/1\.0\.0<\/loc>/);
+    assert.match(xml, /<loc>https:\/\/cfn\.fyi\/<\/loc>/);
+    assert.doesNotMatch(xml, /<loc>https:\/\/cfn\.fyi\/2\.0\.0<\/loc>/);
   });
 
   it('rejects an unknown version', async (t) => {

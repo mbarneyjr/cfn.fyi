@@ -7,13 +7,15 @@ import { layout, space } from '#app/ui/public/styles.ts';
 
 const scriptEntry = await assets.getScriptEntry('app/ui/public/entry.ts');
 
-const origin = 'https://cfn.fyi';
+export const origin = 'https://cfn.fyi';
 
 export interface DocumentProps {
   children?: RemixNode;
   title?: string;
   description: string;
   path: string;
+  noindex?: boolean;
+  page?: { headline: string; description: string; datePublished?: string };
 }
 
 const resetCssHref = await assets.getHref('app/ui/public/reset.css');
@@ -26,7 +28,16 @@ const fontHrefs = await Promise.all(
 
 export function Document(handle: Handle<DocumentProps>) {
   return () => {
-    const { children, title = 'cfn.fyi', description, path } = handle.props;
+    const { children, title = 'cfn.fyi', description, path, noindex, page } = handle.props;
+    const structuredData = {
+      '@context': 'https://schema.org',
+      '@graph': [
+        { '@type': 'WebSite', '@id': `${origin}/#website`, url: origin, name: 'cfn.fyi', inLanguage: 'en-US' },
+        ...(page
+          ? [{ ...page, '@type': 'TechArticle', url: `${origin}${path}`, isPartOf: { '@id': `${origin}/#website` } }]
+          : []),
+      ],
+    };
     const { href, importMap, preloads } = scriptEntry;
     return (
       <html lang="en-US" data-rmx-preserve-attrs="data-theme">
@@ -38,6 +49,12 @@ export function Document(handle: Handle<DocumentProps>) {
           </script>
           <title>{title}</title>
           <meta name="description" content={description} />
+          <meta
+            name="robots"
+            content={noindex ? 'noindex, follow' : 'index, follow, max-image-preview:large, max-snippet:-1'}
+          />
+          <meta name="theme-color" content="#f7f9fc" media="(prefers-color-scheme: light)" />
+          <meta name="theme-color" content="#0e2035" media="(prefers-color-scheme: dark)" />
           <meta property="og:type" content="website" />
           <meta property="og:locale" content="en_US" />
           <meta property="og:site_name" content="cfn.fyi" />
@@ -49,6 +66,7 @@ export function Document(handle: Handle<DocumentProps>) {
           <meta name="twitter:site" content="@mbarneyjr" />
           <meta name="twitter:creator" content="@mbarneyjr" />
           <link rel="icon" type="image/svg+xml" href={faviconHref} />
+          <script type="application/ld+json">{JSON.stringify(structuredData)}</script>
           <ImportMap value={importMap} />
           {preloads.map((preloadHref) => (
             <link key={preloadHref} rel="modulepreload" href={preloadHref} />

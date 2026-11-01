@@ -10,7 +10,7 @@ export function NotFoundPage(handle: Handle<NotFoundPageProps>) {
   return () => {
     const { path } = handle.props;
     return (
-      <Document title="cfn.fyi · Not found" description="The requested page does not exist." path={path}>
+      <Document title="cfn.fyi · Not found" description="The requested page does not exist." path={path} noindex>
         <header mix={[layout.stack, space.gap2, text.alignCenter]}>
           <p mix={[text.label, color.brand]}>404</p>
           <h1 mix={text.title}>Not found</h1>
