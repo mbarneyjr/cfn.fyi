@@ -1,0 +1,31 @@
+name: pr-comment
+description: Create or update the comment that has the given marker on the current pull request
+
+inputs:
+  marker:
+    description: Hidden marker that identifies the comment
+    required: true
+  body:
+    description: Comment body
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        PR_NUMBER: ${{ github.event.pull_request.number }}
+        MARKER: <!-- ${{ inputs.marker }} -->
+        BODY: ${{ inputs.body }}
+      run: |
+        set -euo pipefail
+        BODY="${MARKER}"$'\n'"${BODY}"
+        COMMENT_ID=$(gh api --paginate "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" \
+          --jq '.[] | select(.user.login == "github-actions[bot]" and (.body | startswith(env.MARKER))) | .id' |
+          head -n 1)
+        if [[ -n "${COMMENT_ID}" ]]; then
+          gh api -X PATCH "repos/${GITHUB_REPOSITORY}/issues/comments/${COMMENT_ID}" -f body="${BODY}" >/dev/null
+        else
+          gh pr comment "${PR_NUMBER}" --repo "${GITHUB_REPOSITORY}" --body "${BODY}"
+        fi

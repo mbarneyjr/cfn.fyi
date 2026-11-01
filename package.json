@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json.schemastore.org/package.json",
+  "name": "cfnfyi",
+  "version": "0.0.0",
+  "description": "",
+  "type": "module",
+  "scripts": {
+    "lint": "npm run --workspaces lint && cfn-lint",
+    "lint:fix": "biome check --fix",
+    "ci": "npm run lint && npm run --workspaces typecheck && npm run --workspaces test"
+  },
+  "workspaces": [
+    "packages/*"
+  ],
+  "devDependencies": {
+    "@biomejs/biome": "^2.3.8",
+    "cfn-changeset-viewer": "^0.3.7",
+    "cfn-event-tailer": "^0.1.8"
+  }
+}

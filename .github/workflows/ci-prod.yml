@@ -1,0 +1,51 @@
+name: release-prod
+
+on:
+  workflow_dispatch: {}
+
+env:
+  TARGET_ACCOUNT_ID: ${{ secrets.PROD_ACCOUNT_ID }}
+  COLUMNS: 160
+
+permissions:
+  id-token: write
+  contents: write
+  packages: read
+
+defaults:
+  run:
+    shell: nix develop --command bash -e {0}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-24.04-arm
+    concurrency:
+      group: deploy-prod
+      cancel-in-progress: false
+    environment:
+      name: prod
+      url: https://cfn.fyi
+    steps:
+      - uses: actions/checkout@v7
+      - name: Assume role
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          aws-region: us-east-1
+          role-to-assume: arn:aws:iam::${{ env.TARGET_ACCOUNT_ID }}:role/github-actions
+          role-session-name: GitHubActions-${{ github.run_id }}
+      - uses: cachix/install-nix-action@v31
+      - uses: nix-community/cache-nix-action@v7
+        with:
+          primary-key: nix-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('**/*.nix', '**/flake.lock') }}
+          restore-prefixes-first-match: nix-${{ runner.os }}-${{ runner.arch }}-
+      - uses: actions/setup-node@v7
+        with:
+          cache: npm
+      - name: Install
+        run: npm ci
+      - name: Test
+        run: |
+          ./scripts/test.sh
+      - name: Deploy
+        run: |
+          ./scripts/deploy.sh prod

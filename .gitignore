@@ -1,0 +1,12 @@
+/artifacts
+node_modules
+*.local
+*.local.*
+.venv
+.direnv
+dependencies
+.env.*
+!.env.dev
+!.env.qa
+!.env.prod
+result

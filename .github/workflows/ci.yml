@@ -1,0 +1,30 @@
+name: ci
+
+on:
+  push: {}
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: nix develop --command bash -e {0}
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v7
+      - uses: cachix/install-nix-action@v31
+      - uses: nix-community/cache-nix-action@v7
+        with:
+          primary-key: nix-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('**/*.nix', '**/flake.lock') }}
+          restore-prefixes-first-match: nix-${{ runner.os }}-${{ runner.arch }}-
+      - uses: actions/setup-node@v7
+        with:
+          cache: npm
+      - name: Install
+        run: npm ci
+      - name: Test
+        run: |
+          ./scripts/test.sh

@@ -1,0 +1,218 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Frontend infrastructure for site hosting
+
+
+Parameters:
+  ApplicationName:
+    Type: String
+    Description: The name of the application
+  EnvironmentName:
+    Type: String
+    Description: The name of the environment
+  HostedZoneId:
+    Type: String
+  DomainName:
+    Type: String
+  CodeBucket:
+    Type: String
+    Description: Versioned S3 bucket that contains the site deployment package
+  CodeKey:
+    Type: String
+    Description: S3 key of the site deployment package
+  CodeVersion:
+    Type: String
+    Description: S3 object version of the site deployment package
+
+
+Resources:
+  SiteFunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Sub arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+
+  SiteFunction:
+    Type: AWS::Lambda::WebFunction
+    Metadata:
+      cfn-lint:
+        config:
+          ignore_checks:
+            - E3006
+    Properties:
+      FunctionName: !Sub ${ApplicationName}-${EnvironmentName}-site
+
+  SiteFunctionRevision:
+    Type: AWS::Lambda::WebFunctionRevision
+    Metadata:
+      cfn-lint:
+        config:
+          ignore_checks:
+            - E3006
+    DependsOn: SiteFunction
+    Properties:
+      FunctionName: !Sub ${ApplicationName}-${EnvironmentName}-site
+      BuildConfig:
+        CodeConfig:
+          S3Object:
+            Bucket: !Ref CodeBucket
+            Key: !Ref CodeKey
+            VersionId: !Ref CodeVersion
+        RuntimeConfig:
+          Runtime: nodejs24.x
+      ServiceConfig:
+        ExecutionRoleArn: !GetAtt SiteFunctionRole.Arn
+        TimeoutSeconds: 60
+        EnvironmentVariables:
+          NODE_ENV: production
+          NODE_OPTIONS: --import remix/node-tsx
+          ENVIRONMENT_NAME: !Ref EnvironmentName
+          AWS_LAMBDA_NODEJS_ENTRYPOINT: packages/site/server.ts
+
+  SiteFunctionEndpoint:
+    Type: AWS::Lambda::WebFunctionEndpoint
+    Metadata:
+      cfn-lint:
+        config:
+          ignore_checks:
+            - E3006
+    DependsOn: SiteFunction
+    Properties:
+      FunctionName: !Sub ${ApplicationName}-${EnvironmentName}-site
+      EndpointName: primary
+      EndpointType: HomeRegion
+      AuthType: IamAuth
+      RevisionWeights:
+        - RevisionId: !GetAtt SiteFunctionRevision.RevisionId
+          Weight: 100
+
+  SiteFunctionPolicy:
+    Type: AWS::Lambda::ResourcePolicy
+    Properties:
+      ResourceArn: !GetAtt SiteFunctionEndpoint.FunctionArn
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: AllowCloudFrontOACAccess
+            Effect: Allow
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Action: lambda:InvokeWebFunctionEndpoint
+            Resource: !GetAtt SiteFunctionEndpoint.EndpointArn
+            Condition:
+              StringEquals:
+                aws:SourceArn: !Sub arn:${AWS::Partition}:cloudfront::${AWS::AccountId}:distribution/${SiteDistribution}
+
+  SiteOriginAccessControl:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Name: !Sub ${ApplicationName}-${EnvironmentName}-site
+        OriginAccessControlOriginType: lambda
+        SigningBehavior: always-amz-auth
+        SigningProtocol: sigv4
+
+  Certificate:
+    Type: AWS::CertificateManager::Certificate
+    Properties:
+      DomainName: !Sub ${DomainName}
+      SubjectAlternativeNames:
+        - !Sub '*.${DomainName}'
+      ValidationMethod: DNS
+      DomainValidationOptions:
+        - DomainName: !Ref DomainName
+          HostedZoneId: !Ref HostedZoneId
+
+  SiteDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        Comment: !Sub ${ApplicationName}-${EnvironmentName}-${DomainName}
+        HttpVersion: http2
+        Aliases:
+          - !Ref DomainName
+        ViewerCertificate:
+          AcmCertificateArn: !Ref Certificate
+          SslSupportMethod: sni-only
+          MinimumProtocolVersion: TLSv1.2_2019
+        Origins:
+          - Id: primary
+            DomainName: !GetAtt SiteFunctionEndpoint.DomainName
+            OriginAccessControlId: !GetAtt SiteOriginAccessControl.Id
+            CustomOriginConfig:
+              OriginProtocolPolicy: https-only
+              OriginReadTimeout: 60
+        DefaultCacheBehavior:
+          TargetOriginId: primary
+          ViewerProtocolPolicy: redirect-to-https
+          Compress: true
+          CachePolicyId: !Ref SiteCachePolicy
+          OriginRequestPolicyId: b689b0a8-53d0-40ab-baf2-68738e2966ac # all viewer except host header
+
+  SiteCachePolicy:
+    Type: AWS::CloudFront::CachePolicy
+    Properties:
+      CachePolicyConfig:
+        Name: !Sub ${ApplicationName}-${EnvironmentName}-site
+        MinTTL: 0
+        DefaultTTL: 0
+        MaxTTL: 31536000
+        ParametersInCacheKeyAndForwardedToOrigin:
+          EnableAcceptEncodingGzip: true
+          EnableAcceptEncodingBrotli: true
+          CookiesConfig:
+            CookieBehavior: none
+          HeadersConfig:
+            HeaderBehavior: none
+          QueryStringsConfig:
+            QueryStringBehavior: all
+
+  SiteLogGroup:
+    Type: AWS::Logs::LogGroup
+    UpdateReplacePolicy: Delete
+    DeletionPolicy: Delete
+    Properties:
+      LogGroupName: !Sub ${ApplicationName}-${EnvironmentName}-cloudfront-logs
+  SiteLogDeliverySource:
+    Type: AWS::Logs::DeliverySource
+    Properties:
+      Name: !Sub ${ApplicationName}-${EnvironmentName}-cloudfront
+      LogType: ACCESS_LOGS
+      ResourceArn: !Sub arn:${AWS::Partition}:cloudfront::${AWS::AccountId}:distribution/${SiteDistribution}
+  SiteLogDeliveryDestination:
+    Type: AWS::Logs::DeliveryDestination
+    Properties:
+      Name: !Sub ${ApplicationName}-${EnvironmentName}-cloudfront-logs
+      OutputFormat: json
+      DestinationResourceArn: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:${SiteLogGroup}
+  SiteLogDelivery:
+    Type: AWS::Logs::Delivery
+    Properties:
+      DeliverySourceName: !Ref SiteLogDeliverySource
+      DeliveryDestinationArn: !GetAtt SiteLogDeliveryDestination.Arn
+
+  SiteDnsRecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      Type: A
+      AliasTarget:
+        DNSName: !Sub ${SiteDistribution.DomainName}
+        HostedZoneId: Z2FDTNDATAQYW2
+      Name: !Ref DomainName
+      HostedZoneId: !Ref HostedZoneId
+
+
+Outputs:
+  SiteUrl:
+    Description: URL of the site
+    Value: !Sub https://${DomainName}/
+  DistributionId:
+    Description: ID of the CloudFront distribution
+    Value: !Ref SiteDistribution

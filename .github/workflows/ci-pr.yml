@@ -1,0 +1,129 @@
+name: ci-pr
+
+on:
+  pull_request:
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - labeled
+      - unlabeled
+    branches:
+      - main
+      - feature/*
+
+concurrency:
+  group: ci-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+env:
+  TARGET_ACCOUNT_ID: ${{ secrets.DEV_ACCOUNT_ID }}
+  COLUMNS: 160
+
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: write
+
+defaults:
+  run:
+    shell: nix develop --command bash -e {0}
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v7
+      - uses: cachix/install-nix-action@v31
+      - uses: nix-community/cache-nix-action@v7
+        with:
+          primary-key: nix-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('**/*.nix', '**/flake.lock') }}
+          restore-prefixes-first-match: nix-${{ runner.os }}-${{ runner.arch }}-
+      - uses: actions/setup-node@v7
+        with:
+          cache: npm
+      - name: Install
+        run: npm ci
+      - name: Test
+        run: |
+          ./scripts/test.sh
+  plan_dev:
+    needs: [check]
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v7
+      - name: Assume role
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          aws-region: us-east-1
+          role-to-assume: arn:aws:iam::${{ env.TARGET_ACCOUNT_ID }}:role/github-actions
+          role-session-name: GitHubActions-${{ github.run_id }}
+      - uses: cachix/install-nix-action@v31
+      - uses: nix-community/cache-nix-action@v7
+        with:
+          primary-key: nix-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('**/*.nix', '**/flake.lock') }}
+          restore-prefixes-first-match: nix-${{ runner.os }}-${{ runner.arch }}-
+      - uses: actions/setup-node@v7
+        with:
+          cache: npm
+      - name: Install
+        run: npm ci
+      - name: Plan
+        run: |
+          ./scripts/utils/build.sh
+          ./scripts/utils/package-lambda.sh dev
+          ./scripts/utils/plan.sh dev site
+      - name: Render change set
+        id: changeset
+        run: |
+          CHANGE_SET_PATH=artifacts/changesets/dev-site.changeset.json
+          CHANGE_SET_ID=$(jq -r .ChangeSetId "${CHANGE_SET_PATH}")
+          if [[ $(jq -r .Status "${CHANGE_SET_PATH}") == "FAILED" ]]; then
+            BODY='No changes against `dev`.'
+          else
+            DIFF=$(npx cfn-changeset-viewer --change-set-name "${CHANGE_SET_ID}" --no-show-color)
+            BODY=$'Change set against `dev`:\n\n```diff\n'"${DIFF:0:60000}"$'\n```'
+          fi
+          aws cloudformation delete-change-set --change-set-name "${CHANGE_SET_ID}"
+          DELIMITER=$(openssl rand -hex 16)
+          printf 'body<<%s\n%s\n%s\n' "${DELIMITER}" "${BODY}" "${DELIMITER}" >>"${GITHUB_OUTPUT}"
+      - name: Comment change set
+        uses: ./.github/actions/pr-comment
+        with:
+          marker: ci:plan-dev
+          body: ${{ steps.changeset.outputs.body }}
+  deploy_pr:
+    needs: [check, plan_dev]
+    if: contains(github.event.pull_request.labels.*.name, 'ci:deploy-preview')
+    runs-on: ubuntu-24.04-arm
+    concurrency:
+      group: pr-${{ github.event.pull_request.number }}
+      cancel-in-progress: false
+    env:
+      ENVIRONMENT_NAME: ${{ github.event.pull_request.number }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Assume role
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          aws-region: us-east-1
+          role-to-assume: arn:aws:iam::${{ env.TARGET_ACCOUNT_ID }}:role/github-actions
+          role-session-name: GitHubActions-${{ github.run_id }}
+      - uses: cachix/install-nix-action@v31
+      - uses: nix-community/cache-nix-action@v7
+        with:
+          primary-key: nix-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('**/*.nix', '**/flake.lock') }}
+          restore-prefixes-first-match: nix-${{ runner.os }}-${{ runner.arch }}-
+      - uses: actions/setup-node@v7
+        with:
+          cache: npm
+      - name: Install
+        run: npm ci
+      - name: Deploy
+        run: |
+          ./scripts/deploy.sh "${ENVIRONMENT_NAME}"
+      - name: Comment URL
+        uses: ./.github/actions/pr-comment
+        with:
+          marker: ci:deploy-preview
+          body: Deployed to https://${{ env.ENVIRONMENT_NAME }}.dev.cfn.fyi/
