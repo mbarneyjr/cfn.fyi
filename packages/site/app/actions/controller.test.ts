@@ -111,7 +111,8 @@ describe('changelog', () => {
     assert.match(html, /<title>cfn\.fyi · CloudFormation resource types<\/title>/);
     assert.match(html, /<a href="\/">Versions<\/a>/);
     assert.doesNotMatch(html, />Resources<\/a>/);
-    assert.match(html, /href="\/resources\/AWS%3A%3ATest%3A%3AThing"/);
+    assert.match(html, /<details><summary[^>]*>.*AWS::.*Test.*>1<\/span><\/summary>/);
+    assert.match(html, /href="\/resources\/AWS%3A%3ATest%3A%3AThing"[^>]*>.*>Thing<\/span>/);
     assert.match(html, /2\.0\.0/);
     assert.doesNotMatch(html, /3\.0\.0/);
   });

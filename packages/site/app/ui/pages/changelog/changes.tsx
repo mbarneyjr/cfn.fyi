@@ -63,7 +63,7 @@ export function TypeName(handle: Handle<{ name: string }>) {
   };
 }
 
-const chevron = css({
+export const chevron = css({
   flex: 'none',
   color: 'var(--color-brand)',
   transition: 'transform var(--duration-fast) var(--easing-standard)',
@@ -71,13 +71,13 @@ const chevron = css({
   '@media (prefers-reduced-motion: reduce)': { transition: 'none' },
 });
 
-const invisible = css({ visibility: 'hidden' });
+export const invisible = css({ visibility: 'hidden' });
 
-const row = css({ cursor: 'default', listStyle: 'none', '&::-webkit-details-marker': { display: 'none' } });
+export const row = css({ cursor: 'default', listStyle: 'none', '&::-webkit-details-marker': { display: 'none' } });
 
-const summaryRow = css({ cursor: 'pointer', '&:hover': { backgroundColor: 'var(--color-sheet)' } });
+export const summaryRow = css({ cursor: 'pointer', '&:hover': { backgroundColor: 'var(--color-sheet)' } });
 
-const entryHeader = css({
+export const entryHeader = css({
   gap: 'var(--space-2)',
   paddingInline: 'var(--space-3)',
   '@media (max-width: 640px)': { paddingInline: 'var(--space-2)' },
