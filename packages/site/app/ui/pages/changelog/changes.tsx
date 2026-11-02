@@ -1,6 +1,6 @@
 import { css, type Handle } from 'remix/component';
+import type { Block, Changelog, Line, Mark, Segment, Status } from '#app/data/comparison.ts';
 import { border, color, layout, space, text } from '#app/ui/public/styles.ts';
-import type { Block, Changelog, Line, Mark, Segment, Status } from './comparison.ts';
 import { ExpandControls } from './public/expand-controls.tsx';
 
 const tone = (token: string, wash?: string) => css({ color: token, '--link-color': token, backgroundColor: wash });
@@ -190,15 +190,9 @@ const sectionHeading = css({ flex: '1 1 var(--heading-min)' });
 
 const counter = (index: number) => String(index + 1).padStart(2, '0');
 
-interface ChangelogChangesProps {
-  changelog?: Changelog;
-  error?: string;
-}
-
-export function ChangelogChanges(handle: Handle<ChangelogChangesProps>) {
+export function ChangelogChanges(handle: Handle<{ changelog: Changelog }>) {
   return () => {
-    const { changelog, error } = handle.props;
-    if (!changelog) return <p mix={color.removed}>{error}</p>;
+    const { changelog } = handle.props;
     const groups = groupTitles
       .map(([status, title]) => ({
         status,

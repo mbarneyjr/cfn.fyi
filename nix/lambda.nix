@@ -13,7 +13,7 @@
             ../packages
           ];
         };
-        npmDepsHash = "sha256-QRidKgxQK8y+D+VY4yhKAUaFCePSFvtnfHkjedA5uJE=";
+        npmDepsHash = "sha256-v4VSeN1EMcRtVBqUN0geP9QVvz95qGdpsR8Dp3l7Erk=";
         dontNpmBuild = true;
       };
       packages.zip = pkgs.runCommand "cfnfyi-zip" { nativeBuildInputs = [ pkgs.zip ]; } ''

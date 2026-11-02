@@ -24,17 +24,15 @@ export interface Specification {
   PropertyTypes: Record<string, Definition>;
 }
 
-export interface Neighbor {
-  version: string;
-  date?: string;
-}
-
 const bucketUrl = 'https://cfn-resource-specifications-us-east-1-prod.s3.us-east-1.amazonaws.com';
 
 const fileUrl = (version: string, folder = '') =>
   `${bucketUrl}/${version}/${folder}CloudFormationResourceSpecification.json`;
 
-export async function listCfnVersions() {
+export const ordinal = (version: string) =>
+  version.split('.').reduce((total, part) => total * 1000 + Number.parseInt(part, 10), 0);
+
+export async function listSourceVersions() {
   const versions: string[] = [];
   let token: string | undefined;
   do {
@@ -49,16 +47,10 @@ export async function listCfnVersions() {
   return versions.sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
 }
 
-export async function neighbor(version: string | undefined): Promise<Neighbor | undefined> {
-  if (!version) return undefined;
-  const response = await fetch(fileUrl(version), { method: 'HEAD' }).catch(() => undefined);
-  const modified = response?.ok && response.headers.get('last-modified');
-  return { version, date: modified ? new Date(modified).toISOString().slice(0, 10) : undefined };
+export async function requestSource(version: string, method: 'GET' | 'HEAD') {
+  const response = await fetch(fileUrl(version, 'gzip/'), { method });
+  if (response.ok) return response;
+  return fetch(fileUrl(version), { method });
 }
 
-export async function specification(version: string) {
-  let response = await fetch(fileUrl(version, 'gzip/'));
-  if (!response.ok) response = await fetch(fileUrl(version));
-  if (!response.ok) throw new Error(`Download ${version} failed: ${response.status}`);
-  return (await response.json()) as Specification;
-}
+export const parseSpecification = (json: Uint8Array) => JSON.parse(Buffer.from(json).toString('utf8')) as Specification;

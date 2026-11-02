@@ -1,7 +1,11 @@
 import { clientEntry, css, type Handle, on } from 'remix/component';
 import { routes } from '#app/routes.ts';
-import type { Neighbor } from '#app/ui/pages/changelog/specification.ts';
 import { color, layout, space, text } from '#app/ui/public/styles.ts';
+
+export interface Neighbor {
+  version: string;
+  date?: string;
+}
 
 interface ChangelogNavigationProps {
   versions: string[];

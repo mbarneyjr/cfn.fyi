@@ -1,0 +1,11 @@
+-- data-table/transaction: none
+create table resource_changes (
+  resource_type text not null,
+  ordinal integer not null,
+  version text not null references versions (version),
+  status text not null,
+  block text not null,
+  block_sha256 text not null,
+  primary key (resource_type, ordinal),
+  unique (ordinal, resource_type)
+);

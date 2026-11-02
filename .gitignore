@@ -10,3 +10,5 @@ dependencies
 !.env.qa
 !.env.prod
 result
+/recovered-specifications
+/.data

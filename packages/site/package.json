@@ -11,16 +11,25 @@
     "start": "NODE_ENV=production node --import remix/node-tsx server.ts",
     "test": "NODE_ENV=test remix test",
     "typecheck": "tsc --noEmit",
+    "db:migrate": "node --import remix/node-tsx db/migrate.ts",
+    "synchronize": "node --import remix/node-tsx app/events/synchronize-archive.ts",
+    "rebuild": "node --import remix/node-tsx app/events/rebuild-changes.ts",
     "lint": "biome check"
   },
   "engines": {
     "node": ">=24.3.0"
   },
   "dependencies": {
+    "@aws-sdk/client-cloudfront": "3.1152.0",
+    "@aws-sdk/client-lambda": "3.1152.0",
+    "@aws-sdk/client-s3": "3.1152.0",
+    "@aws-sdk/dsql-signer": "3.1152.0",
+    "pg": "8.23.1",
     "remix": "^3.0.0"
   },
   "devDependencies": {
     "@types/node": "latest",
+    "@types/pg": "8.23.1",
     "typescript": "latest"
   }
 }

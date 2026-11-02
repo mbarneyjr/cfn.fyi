@@ -1,11 +1,10 @@
-import { css, Frame, type Handle } from 'remix/component';
+import { css, type Handle } from 'remix/component';
+import type { Changelog, Status } from '#app/data/comparison.ts';
 import { routes } from '#app/routes.ts';
 import { Document } from '#app/ui/pages/lib/document.tsx';
 import { color, layout, space, text } from '#app/ui/public/styles.ts';
-import { Badge } from './changes.tsx';
-import type { Status } from './comparison.ts';
-import { ChangelogNavigation } from './public/navigation.tsx';
-import type { Neighbor } from './specification.ts';
+import { Badge, ChangelogChanges } from './changes.tsx';
+import { ChangelogNavigation, type Neighbor } from './public/navigation.tsx';
 
 interface ChangelogPageProps {
   home: boolean;
@@ -14,6 +13,7 @@ interface ChangelogPageProps {
   date?: string;
   previous?: Neighbor;
   next?: Neighbor;
+  changelog: Changelog;
 }
 
 const statuses: Status[] = ['added', 'modified', 'removed'];
@@ -22,8 +22,11 @@ const legend = css({ listStyle: 'none', padding: 0, margin: 0 });
 
 export function ChangelogPage(handle: Handle<ChangelogPageProps>) {
   return () => {
-    const { home, ...navigation } = handle.props;
-    const { version, date, previous } = navigation;
+    const { home, changelog, ...navigation } = handle.props;
+    const { version, date, previous, next } = navigation;
+    const neighbors = [previous, next].flatMap((neighbor) =>
+      neighbor ? [routes.version.href({ version: neighbor.version })] : [],
+    );
     const title = home
       ? 'cfn.fyi · CloudFormation specification changelog'
       : `cfn.fyi · CloudFormation specification version ${version}`;
@@ -39,6 +42,7 @@ export function ChangelogPage(handle: Handle<ChangelogPageProps>) {
         path={home || version === navigation.versions.at(-1) ? routes.index.href() : routes.version.href({ version })}
         page={{ headline: title, description, datePublished: date }}
       >
+        <script type="speculationrules">{JSON.stringify({ prerender: [{ urls: neighbors }] })}</script>
         <div mix={[layout.stack, space.gap4]}>
           <header mix={[layout.stack, space.gap3]}>
             <div mix={[layout.stack, space.gap1]}>
@@ -66,7 +70,7 @@ export function ChangelogPage(handle: Handle<ChangelogPageProps>) {
             </ul>
           </header>
           <ChangelogNavigation {...navigation} />
-          <Frame key={version} src={routes.changes.href({ version })} fallback={<p>Loading changes…</p>} />
+          <ChangelogChanges changelog={changelog} />
           <ChangelogNavigation {...navigation} />
         </div>
       </Document>
