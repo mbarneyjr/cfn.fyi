@@ -23,7 +23,7 @@ in
         depends_on.database.condition = "process_healthy";
       };
       settings.processes.synchronize = {
-        command = "${environment} npm run synchronize --workspace @cfnfyi/site -- --limit 20 && ${environment} npm run rebuild --workspace @cfnfyi/site";
+        command = "${environment} npm run synchronize --workspace @cfnfyi/site &&${environment} npm run rebuild --workspace @cfnfyi/site";
         depends_on.migrate.condition = "process_completed_successfully";
       };
       settings.processes.site = {

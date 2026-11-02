@@ -1,5 +1,4 @@
 import { createHash } from 'node:crypto';
-import { parseArgs } from 'node:util';
 import { gzipSync } from 'node:zlib';
 import { InvokeCommand, LambdaClient } from '@aws-sdk/client-lambda';
 import type { Database } from 'remix/data-table';
@@ -14,7 +13,6 @@ const downloadConcurrency = 8;
 interface SynchronizeOptions {
   db: Database;
   archive: Archive;
-  limit?: number;
   now?: Date;
 }
 
@@ -65,10 +63,9 @@ async function archiveVersion(
   return 'archived';
 }
 
-export async function synchronizeArchive({ db, archive, limit, now = new Date() }: SynchronizeOptions) {
+export async function synchronizeArchive({ db, archive, now = new Date() }: SynchronizeOptions) {
   const timestamp = now.toISOString();
-  const listed = await listSourceVersions();
-  const source = limit ? listed.slice(-limit) : listed;
+  const source = await listSourceVersions();
   const rows = new Map((await db.query(versions).all()).map((row) => [row.version, row]));
   const result: SynchronizeResult = { archived: [], unavailable: [], removed: [], pending: 0 };
   const record = (version: string, outcome: string) => {
@@ -95,7 +92,7 @@ export async function synchronizeArchive({ db, archive, limit, now = new Date() 
     }),
   );
 
-  const listedSet = new Set(listed);
+  const listedSet = new Set(source);
   for (const row of rows.values()) {
     if (listedSet.has(row.version) || row.removed_at) continue;
     await db.update(versions, row.version, { removed_at: timestamp });
@@ -117,9 +114,7 @@ export async function handler() {
 }
 
 if (import.meta.main) {
-  const { values } = parseArgs({ options: { limit: { type: 'string' } } });
-  const limit = values.limit ? Number.parseInt(values.limit, 10) : undefined;
-  const result = await withDatabase((db) => synchronizeArchive({ db, archive: createArchive(), limit }));
+  const result = await withDatabase((db) => synchronizeArchive({ db, archive: createArchive() }));
   console.log(
     `archived ${result.archived.length}, unavailable ${result.unavailable.length}, removed ${result.removed.length}`,
   );

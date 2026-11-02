@@ -81,6 +81,7 @@ describe('invalidationPaths', () => {
     assert.deepEqual(invalidationPaths(comparable, ['2.0.0']), [
       '/',
       '/sitemap.xml',
+      '/resources*',
       '/version/1.0.0',
       '/version/2.0.0',
       '/version/3.0.0',

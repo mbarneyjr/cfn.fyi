@@ -23,6 +23,7 @@ describe('changelog', () => {
   before(async () => {
     const seen = '2026-01-01T00:00:00.000Z';
     await db.createMany(versions, [
+      { version: '0.5.0', ordinal: 5000, status: 'ready', first_seen_at: seen },
       {
         version: '1.0.0',
         ordinal: 1000000,
@@ -40,14 +41,23 @@ describe('changelog', () => {
         first_seen_at: seen,
       },
     ]);
-    await db.create(resourceChanges, {
+    const change = {
       resource_type: block.name,
-      ordinal: 2000000,
-      version: '2.0.0',
-      status: 'added',
+      status: 'added' as const,
       block: JSON.stringify(block),
       block_sha256: 'hash',
-    });
+    };
+    await db.createMany(resourceChanges, [
+      { ...change, ordinal: 5000, version: '0.5.0' },
+      {
+        ...change,
+        ordinal: 2000000,
+        version: '2.0.0',
+        status: 'modified',
+        block: JSON.stringify({ ...block, status: 'modified' }),
+      },
+      { ...change, ordinal: 3000000, version: '3.0.0' },
+    ]);
   });
 
   after(() => db.close());
@@ -66,8 +76,15 @@ describe('changelog', () => {
     assert.match(html, /What changed in CloudFormation/);
     assert.match(html, /2\.0\.0/);
     assert.match(html, /2026-02-01/);
-    assert.match(html, /Added resource types/);
+    assert.match(html, /Modified resource types/);
     assert.match(html, /id="aws-test-thing"/);
+    assert.match(html, /<a href="\/resources\/AWS%3A%3ATest%3A%3AThing"[^>]*>history<\/a>/);
+  });
+
+  it('omits the history link for an added resource type', async () => {
+    const html = await (await index('/version/0.5.0')).text();
+    assert.match(html, /Added resource types/);
+    assert.doesNotMatch(html, />history<\/a>/);
   });
 
   it('renders a version from the path', async () => {
@@ -79,8 +96,54 @@ describe('changelog', () => {
     assert.match(html, /No changes in this version/);
     assert.match(
       html,
-      /<script type="speculationrules">\{"prerender":\[\{"urls":\["\/version\/2\.0\.0"\]\}\]\}<\/script>/,
+      /<script type="speculationrules">\{"prerender":\[\{"urls":\["\/version\/0\.5\.0","\/version\/2\.0\.0"\]\}\]\}<\/script>/,
     );
+  });
+
+  it('links to the resource types from the navbar', async () => {
+    assert.match(await (await index(base)).text(), /<a href="\/resources">Resources<\/a>/);
+  });
+
+  it('lists each resource type with the latest ready version that changed it', async () => {
+    const response = await index(routes.resources.href());
+    assert.equal(response.status, 200);
+    const html = await response.text();
+    assert.match(html, /<title>cfn\.fyi · CloudFormation resource types<\/title>/);
+    assert.match(html, /<a href="\/">Versions<\/a>/);
+    assert.doesNotMatch(html, />Resources<\/a>/);
+    assert.match(html, /href="\/resources\/AWS%3A%3ATest%3A%3AThing"/);
+    assert.match(html, /2\.0\.0/);
+    assert.doesNotMatch(html, /3\.0\.0/);
+  });
+
+  it('renders the latest change to a resource type with navigation through its changes only', async () => {
+    const response = await index(routes.resource.href({ type: block.name }));
+    assert.equal(response.status, 200);
+    const html = await response.text();
+    assert.match(html, /<title>cfn\.fyi · AWS::Test::Thing changes<\/title>/);
+    assert.match(html, /<a href="\/resources"[^>]*>← Resource types<\/a>/);
+    assert.match(html, /<a href="\/version\/2\.0\.0"[^>]*>Version 2\.0\.0<\/a>/);
+    assert.match(html, /<div id="aws-test-thing"><h3/);
+    assert.doesNotMatch(html, /<details|expand all/);
+    assert.match(html, /href="\/resources\/AWS%3A%3ATest%3A%3AThing\/0\.5\.0" rel="prev"/);
+    assert.match(html, /This is the latest change/);
+    assert.doesNotMatch(html, />history<\/a>/);
+    assert.doesNotMatch(html, /1\.0\.0/);
+    assert.doesNotMatch(html, /3\.0\.0/);
+  });
+
+  it('renders a resource type at a version that changed it', async () => {
+    const response = await index('/resources/AWS::Test::Thing/0.5.0');
+    assert.equal(response.status, 200);
+    const html = await response.text();
+    assert.match(html, /<title>cfn\.fyi · AWS::Test::Thing changes in version 0\.5\.0<\/title>/);
+    assert.match(html, /This is the first change/);
+  });
+
+  it('rejects a resource type at a version that did not change it', async () => {
+    assert.equal((await index('/resources/AWS::Test::Thing/1.0.0')).status, 404);
+    assert.equal((await index('/resources/AWS::Test::Thing/3.0.0')).status, 404);
+    assert.equal((await index('/resources/AWS::Test::Unknown')).status, 404);
   });
 
   it('rejects an unknown version path', async () => {
@@ -117,6 +180,8 @@ describe('changelog', () => {
     const xml = await response.text();
     assert.match(xml, /<loc>https:\/\/cfn\.fyi\/version\/1\.0\.0<\/loc>/);
     assert.match(xml, /<loc>https:\/\/cfn\.fyi\/<\/loc>/);
+    assert.match(xml, /<loc>https:\/\/cfn\.fyi\/resources<\/loc>/);
+    assert.match(xml, /<loc>https:\/\/cfn\.fyi\/resources\/AWS%3A%3ATest%3A%3AThing<\/loc>/);
     assert.doesNotMatch(xml, /1\.5\.0/);
     assert.doesNotMatch(xml, /<loc>https:\/\/cfn\.fyi\/version\/2\.0\.0<\/loc>/);
   });

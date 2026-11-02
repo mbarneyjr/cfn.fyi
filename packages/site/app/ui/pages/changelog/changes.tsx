@@ -1,5 +1,6 @@
 import { css, type Handle } from 'remix/component';
 import type { Block, Changelog, Line, Mark, Segment, Status } from '#app/data/comparison.ts';
+import { routes } from '#app/routes.ts';
 import { border, color, layout, space, text } from '#app/ui/public/styles.ts';
 import { ExpandControls } from './public/expand-controls.tsx';
 
@@ -44,7 +45,7 @@ export function Badge(handle: Handle<{ status: Status }>) {
   };
 }
 
-function TypeName(handle: Handle<{ name: string }>) {
+export function TypeName(handle: Handle<{ name: string }>) {
   return () => {
     const parts = handle.props.name.split(/(?<=::)/);
     const last = parts.pop();
@@ -90,9 +91,9 @@ const anchor = css({
   '@media (hover: none)': { opacity: 1 },
 });
 
-function EntryHeader(handle: Handle<{ block: Block; expandable: boolean }>) {
+function EntryHeader(handle: Handle<{ block: Block; expandable: boolean; history: boolean }>) {
   return () => {
-    const { block, expandable } = handle.props;
+    const { block, expandable, history } = handle.props;
     return (
       <>
         <span aria-hidden="true" mix={[chevron, !expandable && invisible]}>
@@ -100,6 +101,11 @@ function EntryHeader(handle: Handle<{ block: Block; expandable: boolean }>) {
         </span>
         <Badge status={block.status} />
         <TypeName name={block.name} />
+        {history && (
+          <a href={routes.resource.href({ type: block.name })} mix={[text.small, text.nowrap]}>
+            history
+          </a>
+        )}
         {block.href && (
           <a href={block.href} mix={[text.small, text.nowrap]}>
             docs ↗
@@ -190,9 +196,9 @@ const sectionHeading = css({ flex: '1 1 var(--heading-min)' });
 
 const counter = (index: number) => String(index + 1).padStart(2, '0');
 
-export function ChangelogChanges(handle: Handle<{ changelog: Changelog }>) {
+export function ChangelogChanges(handle: Handle<{ changelog: Changelog; resourceView?: boolean }>) {
   return () => {
-    const { changelog } = handle.props;
+    const { changelog, resourceView = false } = handle.props;
     const groups = groupTitles
       .map(([status, title]) => ({
         status,
@@ -211,33 +217,45 @@ export function ChangelogChanges(handle: Handle<{ changelog: Changelog }>) {
                 <span>{group.title}</span>
                 <span mix={[color.muted, text.tabular, text.regular]}>{group.blocks.length}</span>
               </h2>
-              {group.status !== 'removed' && <ExpandControls />}
+              {group.status !== 'removed' && !resourceView && <ExpandControls />}
             </div>
             <div mix={[layout.cells, layout.stack]}>
               {group.blocks.map((block) => {
                 const header = [layout.row, space.padBlock2, row, entryHeader];
+                const heading = <EntryHeader block={block} expandable={false} history={!resourceView} />;
                 if (block.status === 'removed') {
                   return (
                     <h3 key={block.name} id={block.id} mix={[...header, text.base, text.regular]}>
-                      <EntryHeader block={block} expandable={false} />
+                      {heading}
                     </h3>
+                  );
+                }
+                const changes = (
+                  <pre mix={sheet}>
+                    <code>
+                      {block.lines.map((line, lineIndex) => (
+                        <YamlLine
+                          key={lineIndex}
+                          line={block.status === 'added' ? { ...line, mark: undefined } : line}
+                        />
+                      ))}
+                    </code>
+                  </pre>
+                );
+                if (resourceView) {
+                  return (
+                    <div key={block.name} id={block.id}>
+                      <h3 mix={[...header, text.base, text.regular]}>{heading}</h3>
+                      {changes}
+                    </div>
                   );
                 }
                 return (
                   <details key={block.name} id={block.id}>
                     <summary mix={[...header, summaryRow]}>
-                      <EntryHeader block={block} expandable={true} />
+                      <EntryHeader block={block} expandable={true} history={block.status !== 'added'} />
                     </summary>
-                    <pre mix={sheet}>
-                      <code>
-                        {block.lines.map((line, lineIndex) => (
-                          <YamlLine
-                            key={lineIndex}
-                            line={block.status === 'added' ? { ...line, mark: undefined } : line}
-                          />
-                        ))}
-                      </code>
-                    </pre>
+                    {changes}
                   </details>
                 );
               })}

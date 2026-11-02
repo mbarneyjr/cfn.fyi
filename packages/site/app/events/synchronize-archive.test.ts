@@ -92,13 +92,6 @@ describe('synchronizeArchive', () => {
     assert.ok((await db.find(versions, '1.0.0'))?.removed_at);
   });
 
-  it('archives only the latest versions with a limit', async (t) => {
-    const { db, archive } = await setup(t);
-    t.mock.method(globalThis, 'fetch', source({ '1.0.0': object('1.0.0', '"a"'), '2.0.0': object('2.0.0', '"b"') }));
-    const result = await synchronizeArchive({ db, archive, limit: 1 });
-    assert.deepEqual(result.archived, ['2.0.0']);
-  });
-
   it('reports versions that an earlier run left pending', async (t) => {
     const { db, archive } = await setup(t);
     t.mock.method(globalThis, 'fetch', source({ '1.0.0': object('1.0.0', '"a"') }));

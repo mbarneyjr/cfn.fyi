@@ -19,7 +19,7 @@ function bypassMigrationLock(pool: pg.Pool) {
   });
 }
 
-async function grantRole(pool: pg.Pool, role: string, arn: string, privileges: string) {
+async function grantRole(pool: pg.Pool, role: string, arn: string, privileges: string[]) {
   if (!roleArn.test(arn)) throw new Error(`Invalid role ARN for ${role}: ${arn}`);
   if (!(await pool.query('select 1 from pg_roles where rolname = $1', [role])).rowCount) {
     await pool.query(`create role ${role} with login`);
@@ -29,7 +29,12 @@ async function grantRole(pool: pg.Pool, role: string, arn: string, privileges: s
     arn,
   ]);
   if (!mapping.rowCount) await pool.query(`aws iam grant ${role} to '${arn}'`);
-  await pool.query(`grant ${privileges} on all tables in schema public to ${role}`);
+  const missing = await pool.query(
+    `select 1 from pg_tables, unnest($2::text[]) as privilege
+     where schemaname = 'public' and not has_table_privilege($1, format('public.%I', tablename), privilege) limit 1`,
+    [role, privileges],
+  );
+  if (missing.rowCount) await pool.query(`grant ${privileges.join(', ')} on all tables in schema public to ${role}`);
 }
 
 const pool = createPool();
@@ -39,8 +44,9 @@ try {
   const { applied } = await createPostgresDatabase(pool).migrate(migrations);
   console.log(`applied ${applied.length} migrations`);
   const { READER_ROLE_ARN, WRITER_ROLE_ARN } = process.env;
-  if (READER_ROLE_ARN) await grantRole(pool, 'cfnfyi_reader', READER_ROLE_ARN, 'select');
-  if (WRITER_ROLE_ARN) await grantRole(pool, 'cfnfyi_writer', WRITER_ROLE_ARN, 'select, insert, update, delete');
+  if (READER_ROLE_ARN) await grantRole(pool, 'cfnfyi_reader', READER_ROLE_ARN, ['select']);
+  if (WRITER_ROLE_ARN)
+    await grantRole(pool, 'cfnfyi_writer', WRITER_ROLE_ARN, ['select', 'insert', 'update', 'delete']);
 } finally {
   await pool.end();
 }

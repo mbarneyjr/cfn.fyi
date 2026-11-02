@@ -119,7 +119,7 @@ export async function rebuildChanges({ db, archive }: RebuildOptions) {
 }
 
 export function invalidationPaths(comparable: Version[], changed: string[]) {
-  const paths = new Set(['/', '/sitemap.xml']);
+  const paths = new Set(['/', '/sitemap.xml', '/resources*']);
   const order = comparable.map((version) => version.version);
   for (const version of changed) {
     const index = order.indexOf(version);

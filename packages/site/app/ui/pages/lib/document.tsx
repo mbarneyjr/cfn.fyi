@@ -1,6 +1,7 @@
 import { css, type Handle, type RemixNode } from 'remix/component';
 import { ImportMap } from 'remix/component/server';
 import { assets } from '#app/assets.ts';
+import { routes } from '#app/routes.ts';
 import { Footer } from '#app/ui/public/footer.tsx';
 import { Navbar } from '#app/ui/public/navbar.tsx';
 import { layout, space } from '#app/ui/public/styles.ts';
@@ -92,7 +93,7 @@ export function Document(handle: Handle<DocumentProps>) {
         </head>
         <body mix={css({ display: 'grid', gridTemplateRows: 'auto 1fr auto', gridTemplateColumns: 'minmax(0, 1fr)' })}>
           <header>
-            <Navbar />
+            <Navbar resources={path.startsWith(routes.resources.href())} />
           </header>
           <main mix={[layout.container, layout.stack, space.gap5, space.padBlock4]}>{children}</main>
           <Footer />
