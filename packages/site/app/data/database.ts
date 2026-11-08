@@ -21,8 +21,8 @@ function poolConfig(): pg.PoolConfig {
   };
 }
 
-export function createPool() {
-  const pool = new pg.Pool(poolConfig());
+export function createPool(overrides: pg.PoolConfig = {}) {
+  const pool = new pg.Pool({ ...poolConfig(), ...overrides });
   pool.on('error', (error) => console.error('database pool error', error));
   return pool;
 }

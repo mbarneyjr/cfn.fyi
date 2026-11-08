@@ -2,8 +2,9 @@ import { createHash } from 'node:crypto';
 import { gzipSync } from 'node:zlib';
 import { InvokeCommand, LambdaClient } from '@aws-sdk/client-lambda';
 import type { Database } from 'remix/data-table';
+import { createPostgresDatabase } from 'remix/data-table/postgres';
 import { type Archive, createArchive } from '#app/data/archive.ts';
-import { retryOnConflict, withDatabase } from '#app/data/database.ts';
+import { createPool, retryOnConflict, withDatabase } from '#app/data/database.ts';
 import { listSourceVersions, ordinal, requestSource } from '#app/data/specification.ts';
 import { type Version, versions } from '#app/data/tables.ts';
 
@@ -128,8 +129,11 @@ export async function synchronizeArchive({ db, archive, now = new Date() }: Sync
   return result;
 }
 
+let database: Database | undefined;
+
 export async function handler() {
-  const result = await withDatabase((db) => synchronizeArchive({ db, archive: createArchive() }));
+  database ??= createPostgresDatabase(createPool({ idleTimeoutMillis: 0 }));
+  const result = await synchronizeArchive({ db: database, archive: createArchive() });
   console.log(JSON.stringify({ message: 'synchronized archive', ...result }));
   if ((result.archived.length || result.pending) && process.env.REBUILD_FUNCTION_NAME) {
     await new LambdaClient({}).send(
