@@ -2,7 +2,7 @@ import { createController } from 'remix/router';
 
 import { assets } from '#app/assets.ts';
 import type { Block, Status } from '#app/data/comparison.ts';
-import { resourceChanges, type Version, versions } from '#app/data/tables.ts';
+import { resourceChanges, resourceTypes, type Version, versions } from '#app/data/tables.ts';
 import type { AppContext } from '#app/router.ts';
 import { routes } from '#app/routes.ts';
 import { ChangelogPage } from '#app/ui/pages/changelog/page.tsx';
@@ -30,24 +30,16 @@ const neighbor = (row?: Version): Neighbor | undefined =>
   row && { version: row.version, date: isoDate(row.published_at) };
 
 async function resourceSummaries(context: AppContext) {
-  const ready = new Map((await readyVersions(context)).map((row) => [row.ordinal, row.version]));
-  const changes = await context.db
-    .query(resourceChanges)
-    .select({
-      resource_type: resourceChanges.resource_type,
-      ordinal: resourceChanges.ordinal,
-      status: resourceChanges.status,
-    })
-    .orderBy('ordinal', 'asc')
-    .all();
-  const latest = new Map<string, ResourceSummary>();
-  for (const change of changes) {
-    const version = ready.get(change.ordinal);
-    if (version) {
-      latest.set(change.resource_type, { type: change.resource_type, status: change.status as Status, version });
-    }
-  }
-  return [...latest.values()].sort((a, b) => a.type.localeCompare(b.type));
+  const rows = await context.db.query(resourceTypes).all();
+  return rows
+    .map(
+      (row): ResourceSummary => ({
+        type: row.resource_type,
+        status: row.latest_status as Status,
+        version: row.latest_version,
+      }),
+    )
+    .sort((a, b) => a.type.localeCompare(b.type));
 }
 
 async function resourceVersions(context: AppContext, resourceType: string) {

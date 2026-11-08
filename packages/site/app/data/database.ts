@@ -1,3 +1,4 @@
+import { setTimeout } from 'node:timers/promises';
 import { DsqlSigner } from '@aws-sdk/dsql-signer';
 import pg from 'pg';
 import type { Database } from 'remix/data-table';
@@ -24,6 +25,25 @@ export function createPool() {
   const pool = new pg.Pool(poolConfig());
   pool.on('error', (error) => console.error('database pool error', error));
   return pool;
+}
+
+const conflictAttempts = 5;
+const conflictBaseDelay = 100;
+
+const isConflict = (error: unknown) => {
+  const { code, cause } = error as { code?: string; cause?: { code?: string } };
+  return (code ?? cause?.code) === '40001';
+};
+
+export async function retryOnConflict<result>(run: () => Promise<result>) {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await run();
+    } catch (error) {
+      if (attempt >= conflictAttempts || !isConflict(error)) throw error;
+      await setTimeout(conflictBaseDelay * 2 ** (attempt - 1) + Math.random() * conflictBaseDelay);
+    }
+  }
 }
 
 export async function withDatabase<result>(run: (db: Database) => Promise<result>) {

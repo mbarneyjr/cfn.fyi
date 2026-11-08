@@ -5,9 +5,9 @@ import { gzipSync } from 'node:zlib';
 import * as assert from 'remix/assert';
 import { describe, it } from 'remix/test';
 
-import { createDirectoryArchive } from '#app/data/archive.ts';
+import { DirectoryArchive } from '#app/data/archive.ts';
 import type { Specification } from '#app/data/specification.ts';
-import { resourceChanges, versions } from '#app/data/tables.ts';
+import { resourceChanges, resourceTypes, versions } from '#app/data/tables.ts';
 import { createTestDatabase } from '../../db/test-database.ts';
 import { invalidationPaths, rebuildChanges } from './rebuild-changes.ts';
 
@@ -26,7 +26,7 @@ async function setup(t: { after(callback: () => unknown): void }) {
     await db.close();
     await rm(directory, { recursive: true, force: true });
   });
-  const archive = createDirectoryArchive(directory);
+  const archive = new DirectoryArchive(directory);
   const store = (value: Specification) =>
     archive.write(value.ResourceSpecificationVersion, gzipSync(JSON.stringify(value)));
   const seen = '2026-01-01T00:00:00.000Z';
@@ -56,6 +56,24 @@ describe('rebuildChanges', () => {
       ],
     );
     assert.equal(JSON.parse(rows[1].block).name, 'AWS::Test::New');
+    const types = await db.query(resourceTypes).orderBy('resource_type', 'asc').all();
+    assert.deepEqual(
+      types.map((row) => [row.resource_type, row.latest_version, row.latest_status]),
+      [
+        ['AWS::Test::Gone', '3.0.0', 'removed'],
+        ['AWS::Test::Kept', '1.0.0', 'added'],
+        ['AWS::Test::New', '3.0.0', 'added'],
+      ],
+    );
+  });
+
+  it('reports a type write when the changes are unchanged', async (t) => {
+    const { db, archive } = await setup(t);
+    await rebuildChanges({ db, archive });
+    await db.update(resourceTypes, 'AWS::Test::Kept', { latest_status: 'modified' });
+    const { changed, typesWritten } = await rebuildChanges({ db, archive });
+    assert.deepEqual(changed, []);
+    assert.equal(typesWritten, 1);
   });
 
   it('writes nothing when the archive is unchanged', async (t) => {
@@ -72,6 +90,17 @@ describe('rebuildChanges', () => {
     const { changed } = await rebuildChanges({ db, archive });
     assert.deepEqual(changed, ['3.0.0']);
     assert.equal(await db.count(resourceChanges, { where: { ordinal: 3000000 } }), 0);
+    assert.deepEqual(
+      (await db.query(resourceTypes).orderBy('resource_type', 'asc').all()).map((row) => [
+        row.resource_type,
+        row.latest_version,
+        row.latest_status,
+      ]),
+      [
+        ['AWS::Test::Gone', '1.0.0', 'added'],
+        ['AWS::Test::Kept', '1.0.0', 'added'],
+      ],
+    );
   });
 });
 

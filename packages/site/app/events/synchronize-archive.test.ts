@@ -5,7 +5,7 @@ import { gunzipSync } from 'node:zlib';
 import * as assert from 'remix/assert';
 import { describe, it } from 'remix/test';
 
-import { createDirectoryArchive } from '#app/data/archive.ts';
+import { DirectoryArchive } from '#app/data/archive.ts';
 import { versions } from '#app/data/tables.ts';
 import { createTestDatabase } from '../../db/test-database.ts';
 import { synchronizeArchive } from './synchronize-archive.ts';
@@ -38,7 +38,7 @@ async function setup(t: { after(callback: () => unknown): void }) {
     await db.close();
     await rm(directory, { recursive: true, force: true });
   });
-  return { db, archive: createDirectoryArchive(directory) };
+  return { db, archive: new DirectoryArchive(directory) };
 }
 
 const object = (version: string, etag: string, resources = '{}'): SourceObject => ({
@@ -90,6 +90,15 @@ describe('synchronizeArchive', () => {
     const result = await synchronizeArchive({ db, archive });
     assert.deepEqual(result.removed, ['1.0.0']);
     assert.ok((await db.find(versions, '1.0.0'))?.removed_at);
+  });
+
+  it('does not count a ready version as pending', async (t) => {
+    const { db, archive } = await setup(t);
+    t.mock.method(globalThis, 'fetch', source({ '1.0.0': object('1.0.0', '"a"') }));
+    await synchronizeArchive({ db, archive });
+    await db.update(versions, '1.0.0', { status: 'ready' });
+    const result = await synchronizeArchive({ db, archive });
+    assert.equal(result.pending, 0);
   });
 
   it('reports versions that an earlier run left pending', async (t) => {

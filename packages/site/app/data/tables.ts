@@ -29,5 +29,16 @@ export const resourceChanges = table({
   },
 });
 
+export const resourceTypes = table({
+  name: 'resource_types',
+  primaryKey: 'resource_type',
+  columns: {
+    resource_type: c.text(),
+    latest_version: c.text(),
+    latest_status: c.enum(['added', 'modified', 'removed']),
+  },
+});
+
 export type Version = TableRow<typeof versions>;
 export type ResourceChange = TableRow<typeof resourceChanges>;
+export type ResourceType = TableRow<typeof resourceTypes>;

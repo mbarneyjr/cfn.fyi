@@ -3,7 +3,7 @@ import { gzipSync } from 'node:zlib';
 import { InvokeCommand, LambdaClient } from '@aws-sdk/client-lambda';
 import type { Database } from 'remix/data-table';
 import { type Archive, createArchive } from '#app/data/archive.ts';
-import { withDatabase } from '#app/data/database.ts';
+import { retryOnConflict, withDatabase } from '#app/data/database.ts';
 import { listSourceVersions, ordinal, requestSource } from '#app/data/specification.ts';
 import { type Version, versions } from '#app/data/tables.ts';
 
@@ -23,34 +23,46 @@ export interface SynchronizeResult {
   pending: number;
 }
 
+type KnownVersion = Pick<Version, 'version' | 'status' | 'source_etag' | 'removed_at'>;
+
+interface ArchiveResult {
+  outcome: 'archived' | 'unchanged' | 'unavailable';
+  status: Version['status'];
+}
+
 async function archiveVersion(
   db: Database,
   archive: Archive,
   version: string,
-  existing: Version | undefined,
+  known: KnownVersion | undefined,
   now: string,
-) {
+): Promise<ArchiveResult> {
   const response = await requestSource(version, 'GET');
   if (!response.ok) {
-    if (!existing) {
-      await db.create(versions, { version, ordinal: ordinal(version), status: 'unavailable', first_seen_at: now });
+    if (!known) {
+      await retryOnConflict(() =>
+        db.create(versions, { version, ordinal: ordinal(version), status: 'unavailable', first_seen_at: now }),
+      );
     }
-    return 'unavailable';
+    return { outcome: 'unavailable', status: known?.status ?? 'unavailable' };
   }
   const json = new Uint8Array(await response.arrayBuffer());
   const sha256 = createHash('sha256').update(json).digest('hex');
   const source_etag = response.headers.get('etag');
+  const existing = known && (await db.find(versions, version));
   if (existing?.sha256 === sha256) {
-    await db.update(versions, version, { source_etag });
-    return 'unchanged';
+    await retryOnConflict(() => db.update(versions, version, { source_etag }));
+    return { outcome: 'unchanged', status: existing.status };
   }
   await archive.write(version, gzipSync(json));
   if (existing) {
     const status = existing.status === 'ready' ? 'ready' : 'pending';
-    await db.update(versions, version, { status, source_etag, sha256, updated_at: now });
-  } else {
-    const modified = response.headers.get('last-modified');
-    await db.create(versions, {
+    await retryOnConflict(() => db.update(versions, version, { status, source_etag, sha256, updated_at: now }));
+    return { outcome: 'archived', status };
+  }
+  const modified = response.headers.get('last-modified');
+  await retryOnConflict(() =>
+    db.create(versions, {
       version,
       ordinal: ordinal(version),
       status: 'pending',
@@ -58,17 +70,31 @@ async function archiveVersion(
       first_seen_at: now,
       source_etag,
       sha256,
-    });
-  }
-  return 'archived';
+    }),
+  );
+  return { outcome: 'archived', status: 'pending' };
 }
 
 export async function synchronizeArchive({ db, archive, now = new Date() }: SynchronizeOptions) {
   const timestamp = now.toISOString();
   const source = await listSourceVersions();
-  const rows = new Map((await db.query(versions).all()).map((row) => [row.version, row]));
+  const rows = new Map<string, KnownVersion>(
+    (
+      await db
+        .query(versions)
+        .select({
+          version: versions.version,
+          status: versions.status,
+          source_etag: versions.source_etag,
+          removed_at: versions.removed_at,
+        })
+        .all()
+    ).map((row) => [row.version, row]),
+  );
+  const statuses = new Map([...rows.values()].map((row) => [row.version, row.status]));
   const result: SynchronizeResult = { archived: [], unavailable: [], removed: [], pending: 0 };
-  const record = (version: string, outcome: string) => {
+  const record = (version: string, { outcome, status }: ArchiveResult) => {
+    statuses.set(version, status);
     if (outcome === 'archived') result.archived.push(version);
     if (outcome === 'unavailable') result.unavailable.push(version);
   };
@@ -85,7 +111,7 @@ export async function synchronizeArchive({ db, archive, now = new Date() }: Sync
   const recent = source.slice(-recheckCount).filter((version) => rows.has(version));
   await Promise.all(
     recent.map(async (version) => {
-      const row = rows.get(version) as Version;
+      const row = rows.get(version) as KnownVersion;
       const head = await requestSource(version, 'HEAD');
       if (!head.ok || head.headers.get('etag') === row.source_etag) return;
       record(version, await archiveVersion(db, archive, version, row, timestamp));
@@ -95,10 +121,10 @@ export async function synchronizeArchive({ db, archive, now = new Date() }: Sync
   const listedSet = new Set(source);
   for (const row of rows.values()) {
     if (listedSet.has(row.version) || row.removed_at) continue;
-    await db.update(versions, row.version, { removed_at: timestamp });
+    await retryOnConflict(() => db.update(versions, row.version, { removed_at: timestamp }));
     result.removed.push(row.version);
   }
-  result.pending = await db.count(versions, { where: { status: 'pending' } });
+  result.pending = [...statuses.values()].filter((status) => status === 'pending').length;
   return result;
 }
 

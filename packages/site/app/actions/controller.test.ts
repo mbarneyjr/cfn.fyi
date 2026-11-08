@@ -1,7 +1,7 @@
 import * as assert from 'remix/assert';
 import { after, before, describe, it } from 'remix/test';
 
-import { resourceChanges, versions } from '#app/data/tables.ts';
+import { resourceChanges, resourceTypes, versions } from '#app/data/tables.ts';
 import { createAppRouter } from '#app/router.ts';
 import { routes } from '#app/routes.ts';
 import { createTestDatabase } from '../../db/test-database.ts';
@@ -47,6 +47,11 @@ describe('changelog', () => {
       block: JSON.stringify(block),
       block_sha256: 'hash',
     };
+    await db.create(resourceTypes, {
+      resource_type: block.name,
+      latest_version: '2.0.0',
+      latest_status: 'modified',
+    });
     await db.createMany(resourceChanges, [
       { ...change, ordinal: 5000, version: '0.5.0' },
       {
@@ -61,6 +66,25 @@ describe('changelog', () => {
   });
 
   after(() => db.close());
+
+  it('retries a request after a database conflict', async () => {
+    let failures = 0;
+    const flaky = new Proxy(db, {
+      get(target, property) {
+        if (property === 'query' && failures === 0) {
+          return () => {
+            failures++;
+            throw Object.assign(new Error('schema has been updated by another transaction'), { code: '40001' });
+          };
+        }
+        const value = Reflect.get(target, property, target);
+        return typeof value === 'function' ? value.bind(target) : value;
+      },
+    });
+    const response = await createAppRouter({ db: flaky }).fetch(new URL(base, 'http://localhost'));
+    assert.equal(response.status, 200);
+    assert.equal(failures, 1);
+  });
 
   it('builds the hrefs', () => {
     assert.equal(routes.index.href(), '/');

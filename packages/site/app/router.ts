@@ -5,7 +5,7 @@ import { render } from 'remix/middleware/render';
 import { createContextKey, createRouter, type Middleware, type MiddlewareContext } from 'remix/router';
 import controller from './actions/controller.tsx';
 import { assets } from './assets.ts';
-import { createPool } from './data/database.ts';
+import { createPool, retryOnConflict } from './data/database.ts';
 import { routes } from './routes.ts';
 
 const databaseContext = createContextKey<Database>();
@@ -39,6 +39,8 @@ export function createAppRouter({ db }: { db: Database }) {
     middleware: [compression(), edgeCache, loadDatabase(db), renderMiddleware],
   });
   router.map(routes, controller);
+  const { fetch } = router;
+  router.fetch = (input, init) => retryOnConflict(() => fetch(input, init));
   return router;
 }
 

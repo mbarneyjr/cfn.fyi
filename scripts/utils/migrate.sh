@@ -22,6 +22,6 @@ output() {
 echo "[${APPLICATION_NAME}-${ENVIRONMENT_NAME}-site] migrating database..."
 DATABASE_ENDPOINT=$(output DatabaseEndpoint) \
   DATABASE_USER=admin \
-  READER_ROLE_ARN=$(output SiteFunctionRoleArn) \
-  WRITER_ROLE_ARN=$(output EventFunctionRoleArn) \
+  SITE_FUNCTION_ROLE_ARN=$(output SiteFunctionRoleArn) \
+  EVENT_FUNCTION_ROLE_ARN=$(output EventFunctionRoleArn) \
   npm run db:migrate --workspace @cfnfyi/site

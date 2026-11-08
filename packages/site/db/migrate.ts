@@ -1,4 +1,5 @@
 import { fileURLToPath } from 'node:url';
+import { parseArgs } from 'node:util';
 import type pg from 'pg';
 import { loadMigrations } from 'remix/data-table/migrations/node';
 import { createPostgresDatabase } from 'remix/data-table/postgres';
@@ -37,16 +38,34 @@ async function grantRole(pool: pg.Pool, role: string, arn: string, privileges: s
   if (missing.rowCount) await pool.query(`grant ${privileges.join(', ')} on all tables in schema public to ${role}`);
 }
 
+const {
+  positionals: [direction = 'up'],
+  values,
+} = parseArgs({
+  allowPositionals: true,
+  options: { step: { type: 'string' }, to: { type: 'string' }, 'dry-run': { type: 'boolean' } },
+});
+if (direction !== 'up' && direction !== 'down') throw new Error(`Unknown direction: ${direction}`);
+if (values.to && values.step) throw new Error('Use either --to or --step, not both');
+if (direction === 'down' && !values.to && !values.step) throw new Error('down requires --to or --step');
+const bounds = values.to ? { to: values.to } : values.step ? { step: Number(values.step) } : {};
+
 const pool = createPool();
 if (process.env.DATABASE_ENDPOINT) bypassMigrationLock(pool);
 try {
   const migrations = await loadMigrations(fileURLToPath(new URL('./migrations', import.meta.url)));
-  const { applied } = await createPostgresDatabase(pool).migrate(migrations);
-  console.log(`applied ${applied.length} migrations`);
-  const { READER_ROLE_ARN, WRITER_ROLE_ARN } = process.env;
-  if (READER_ROLE_ARN) await grantRole(pool, 'cfnfyi_reader', READER_ROLE_ARN, ['select']);
-  if (WRITER_ROLE_ARN)
-    await grantRole(pool, 'cfnfyi_writer', WRITER_ROLE_ARN, ['select', 'insert', 'update', 'delete']);
+  const { applied, reverted } = await createPostgresDatabase(pool).migrate(migrations, {
+    ...bounds,
+    direction,
+    dryRun: values['dry-run'],
+  });
+  console.log(`applied ${applied.length} migrations, reverted ${reverted.length}`);
+  if (direction === 'up' && !values['dry-run']) {
+    const { SITE_FUNCTION_ROLE_ARN, EVENT_FUNCTION_ROLE_ARN } = process.env;
+    if (SITE_FUNCTION_ROLE_ARN) await grantRole(pool, 'cfnfyi_reader', SITE_FUNCTION_ROLE_ARN, ['select']);
+    if (EVENT_FUNCTION_ROLE_ARN)
+      await grantRole(pool, 'cfnfyi_writer', EVENT_FUNCTION_ROLE_ARN, ['select', 'insert', 'update', 'delete']);
+  }
 } finally {
   await pool.end();
 }
