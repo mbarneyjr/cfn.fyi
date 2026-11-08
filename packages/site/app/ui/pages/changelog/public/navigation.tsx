@@ -1,9 +1,17 @@
 import { clientEntry, css, type Handle, on } from 'remix/component';
 import { routes } from '#app/routes.ts';
-import type { Neighbor } from '#app/ui/pages/changelog/specification.ts';
 import { color, layout, space, text } from '#app/ui/public/styles.ts';
 
+export interface Neighbor {
+  version: string;
+  date?: string;
+}
+
+export const versionHref = (version: string, resourceType?: string) =>
+  resourceType ? routes.resource.href({ type: resourceType, version }) : routes.version.href({ version });
+
 interface ChangelogNavigationProps {
+  resourceType?: string;
   versions: string[];
   version: string;
   date?: string;
@@ -55,7 +63,8 @@ export const ChangelogNavigation = clientEntry(
   import.meta.url,
   function ChangelogNavigation(handle: Handle<ChangelogNavigationProps>) {
     return () => {
-      const { versions, version, date, previous, next } = handle.props;
+      const { resourceType, versions, version, date, previous, next } = handle.props;
+      const subject = resourceType ? 'change' : 'version';
       const link = (direction: 'previous' | 'next', neighbor?: Neighbor) => {
         const label = <span mix={[text.label, color.brand]}>{direction === 'previous' ? '← Previous' : 'Next →'}</span>;
         const align = direction === 'next' && text.alignEnd;
@@ -64,14 +73,14 @@ export const ChangelogNavigation = clientEntry(
             <div mix={[area(direction), layout.stack, space.gap1, space.padBlock2, space.padInline3, align]}>
               {label}
               <span mix={color.muted}>
-                {direction === 'previous' ? 'This is the first version' : 'This is the latest version'}
+                {direction === 'previous' ? `This is the first ${subject}` : `This is the latest ${subject}`}
               </span>
             </div>
           );
         }
         return (
           <a
-            href={routes.version.href({ version: neighbor.version })}
+            href={versionHref(neighbor.version, resourceType)}
             rel={direction === 'previous' ? 'prev' : 'next'}
             mix={[
               area(direction),
@@ -111,7 +120,7 @@ export const ChangelogNavigation = clientEntry(
               mix={[
                 select,
                 text.tabular,
-                on('change', (event) => location.assign(routes.version.href({ version: event.currentTarget.value }))),
+                on('change', (event) => location.assign(versionHref(event.currentTarget.value, resourceType))),
               ]}
             >
               {versions.toReversed().map((value) => (

@@ -1,4 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::LanguageExtensions
 Description: Frontend infrastructure for site hosting
 
 
@@ -24,7 +25,53 @@ Parameters:
     Description: S3 object version of the site deployment package
 
 
+Conditions:
+  IsProduction: !Equals [!Ref EnvironmentName, prod]
+
+
 Resources:
+  ArchiveBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: !If [IsProduction, Retain, Delete]
+    UpdateReplacePolicy: !If [IsProduction, Retain, Delete]
+    Properties:
+      VersioningConfiguration:
+        Status: Enabled
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+  ArchiveBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Condition: IsProduction
+    Properties:
+      Bucket: !Ref ArchiveBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: DenyArchiveDeletion
+            Effect: Deny
+            Principal: '*'
+            Action:
+              - s3:DeleteObject
+              - s3:DeleteObjectVersion
+              - s3:PutBucketVersioning
+            Resource:
+              - !GetAtt ArchiveBucket.Arn
+              - !Sub ${ArchiveBucket.Arn}/*
+
+  DatabaseCluster:
+    Type: AWS::DSQL::Cluster
+    DeletionPolicy: !If [IsProduction, Retain, Delete]
+    UpdateReplacePolicy: !If [IsProduction, Retain, Delete]
+    Properties:
+      DeletionProtectionEnabled: !If [IsProduction, true, false]
+      Tags:
+        - Key: Name
+          Value: !Sub ${ApplicationName}-${EnvironmentName}
+
   SiteFunctionRole:
     Type: AWS::IAM::Role
     Properties:
@@ -37,6 +84,14 @@ Resources:
             Action: sts:AssumeRole
       ManagedPolicyArns:
         - !Sub arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: database
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: dsql:DbConnect
+                Resource: !GetAtt DatabaseCluster.ResourceArn
 
   SiteFunction:
     Type: AWS::Lambda::WebFunction
@@ -74,6 +129,8 @@ Resources:
           NODE_OPTIONS: --import remix/node-tsx
           ENVIRONMENT_NAME: !Ref EnvironmentName
           AWS_LAMBDA_NODEJS_ENTRYPOINT: packages/site/server.ts
+          DATABASE_ENDPOINT: !Sub ${DatabaseCluster.Identifier}.dsql.${AWS::Region}.on.aws
+          DATABASE_USER: cfnfyi_reader
 
   SiteFunctionEndpoint:
     Type: AWS::Lambda::WebFunctionEndpoint
@@ -198,6 +255,133 @@ Resources:
       DeliverySourceName: !Ref SiteLogDeliverySource
       DeliveryDestinationArn: !GetAtt SiteLogDeliveryDestination.Arn
 
+  EventFunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Sub arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: events
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                Resource: !Sub ${ArchiveBucket.Arn}/*
+              - Effect: Allow
+                Action: dsql:DbConnect
+                Resource: !GetAtt DatabaseCluster.ResourceArn
+              - Effect: Allow
+                Action: lambda:InvokeFunction
+                Resource: !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:${ApplicationName}-${EnvironmentName}-rebuild-changes
+              - Effect: Allow
+                Action: cloudfront:CreateInvalidation
+                Resource: !Sub arn:${AWS::Partition}:cloudfront::${AWS::AccountId}:distribution/${SiteDistribution}
+
+  SynchronizeArchiveFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub ${ApplicationName}-${EnvironmentName}-synchronize-archive
+      Runtime: nodejs24.x
+      Architectures:
+        - arm64
+      Handler: packages/site/app/events/synchronize-archive.handler
+      Code:
+        S3Bucket: !Ref CodeBucket
+        S3Key: !Ref CodeKey
+        S3ObjectVersion: !Ref CodeVersion
+      Role: !GetAtt EventFunctionRole.Arn
+      MemorySize: 1024
+      Timeout: 600
+      Environment:
+        Variables:
+          NODE_ENV: production
+          NODE_OPTIONS: --import remix/node-tsx
+          ENVIRONMENT_NAME: !Ref EnvironmentName
+          ARCHIVE_BUCKET: !Ref ArchiveBucket
+          DATABASE_ENDPOINT: !Sub ${DatabaseCluster.Identifier}.dsql.${AWS::Region}.on.aws
+          DATABASE_USER: cfnfyi_writer
+          REBUILD_FUNCTION_NAME: !Ref RebuildChangesFunction
+
+  RebuildChangesFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub ${ApplicationName}-${EnvironmentName}-rebuild-changes
+      Runtime: nodejs24.x
+      Architectures:
+        - arm64
+      Handler: packages/site/app/events/rebuild-changes.handler
+      Code:
+        S3Bucket: !Ref CodeBucket
+        S3Key: !Ref CodeKey
+        S3ObjectVersion: !Ref CodeVersion
+      Role: !GetAtt EventFunctionRole.Arn
+      MemorySize: 2048
+      Timeout: 900
+      Environment:
+        Variables:
+          NODE_ENV: production
+          NODE_OPTIONS: --import remix/node-tsx
+          ENVIRONMENT_NAME: !Ref EnvironmentName
+          ARCHIVE_BUCKET: !Ref ArchiveBucket
+          DATABASE_ENDPOINT: !Sub ${DatabaseCluster.Identifier}.dsql.${AWS::Region}.on.aws
+          DATABASE_USER: cfnfyi_writer
+          DISTRIBUTION_ID: !Ref SiteDistribution
+
+  SchedulerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: scheduler.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: invoke
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: lambda:InvokeFunction
+                Resource:
+                  - !GetAtt SynchronizeArchiveFunction.Arn
+                  - !GetAtt RebuildChangesFunction.Arn
+
+  SynchronizeArchiveSchedule:
+    Type: AWS::Scheduler::Schedule
+    Properties:
+      Name: !Sub ${ApplicationName}-${EnvironmentName}-synchronize-archive
+      ScheduleExpression: rate(1 minute)
+      FlexibleTimeWindow:
+        Mode: 'OFF'
+      Target:
+        Arn: !GetAtt SynchronizeArchiveFunction.Arn
+        RoleArn: !GetAtt SchedulerRole.Arn
+        RetryPolicy:
+          MaximumRetryAttempts: 0
+
+  RebuildChangesSchedule:
+    Type: AWS::Scheduler::Schedule
+    Properties:
+      Name: !Sub ${ApplicationName}-${EnvironmentName}-rebuild-changes
+      ScheduleExpression: rate(1 day)
+      FlexibleTimeWindow:
+        Mode: 'OFF'
+      Target:
+        Arn: !GetAtt RebuildChangesFunction.Arn
+        RoleArn: !GetAtt SchedulerRole.Arn
+
   SiteDnsRecord:
     Type: AWS::Route53::RecordSet
     Properties:
@@ -216,3 +400,18 @@ Outputs:
   DistributionId:
     Description: ID of the CloudFront distribution
     Value: !Ref SiteDistribution
+  ArchiveBucketName:
+    Description: Versioned bucket that holds every archived specification revision
+    Value: !Ref ArchiveBucket
+  DatabaseEndpoint:
+    Description: Endpoint of the DSQL cluster
+    Value: !Sub ${DatabaseCluster.Identifier}.dsql.${AWS::Region}.on.aws
+  SiteFunctionRoleArn:
+    Description: Role that the database maps to cfnfyi_reader
+    Value: !GetAtt SiteFunctionRole.Arn
+  EventFunctionRoleArn:
+    Description: Role that the database maps to cfnfyi_writer
+    Value: !GetAtt EventFunctionRole.Arn
+  RebuildChangesFunctionName:
+    Description: Function that rebuilds the changes from the archive
+    Value: !Ref RebuildChangesFunction

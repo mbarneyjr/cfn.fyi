@@ -19,7 +19,7 @@ export function Logo(_handle: Handle) {
   );
 }
 
-export const Navbar = clientEntry(import.meta.url, function Navbar(_handle: Handle) {
+export const Navbar = clientEntry(import.meta.url, function Navbar(handle: Handle<{ resources: boolean }>) {
   return () => (
     <nav mix={[border.bottom, space.padBlock2]}>
       <div mix={[layout.container, layout.row, space.gap3]}>
@@ -29,7 +29,12 @@ export const Navbar = clientEntry(import.meta.url, function Navbar(_handle: Hand
             cfn<span mix={color.brand}>.fyi</span>
           </span>
         </a>
-        <div mix={[layout.row, layout.pushEnd, space.gap2]}>
+        <div mix={[layout.row, layout.pushEnd, space.gap3]}>
+          {handle.props.resources ? (
+            <a href={routes.index.href()}>Versions</a>
+          ) : (
+            <a href={routes.resources.href()}>Resources</a>
+          )}
           <ThemeControl />
         </div>
       </div>

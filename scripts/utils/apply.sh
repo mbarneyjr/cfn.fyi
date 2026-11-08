@@ -31,9 +31,15 @@ if [[ -f "${CHANGE_SET_PATH}" && $(jq .Status -r "${CHANGE_SET_PATH}") != "FAILE
 
   CHANGE_SET_ID=$(jq .ChangeSetId -r "${CHANGE_SET_PATH}")
 
+  ROLLBACK_ARGUMENTS=()
+  if [[ "${DISABLE_ROLLBACK:-false}" == "true" ]]; then
+    ROLLBACK_ARGUMENTS+=(--disable-rollback)
+  fi
+
   echo "[${STACK_NAME}] executing changeset [${CHANGE_SET_ID}]..."
   aws cloudformation execute-change-set \
-    --change-set-name "${CHANGE_SET_ID}"
+    --change-set-name "${CHANGE_SET_ID}" \
+    "${ROLLBACK_ARGUMENTS[@]+"${ROLLBACK_ARGUMENTS[@]}"}"
 
   npx cfn-event-tailer "${STACK_NAME}"
 fi
