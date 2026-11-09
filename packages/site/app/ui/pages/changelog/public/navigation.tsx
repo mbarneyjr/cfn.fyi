@@ -91,6 +91,9 @@ export const ChangelogNavigation = clientEntry(
               text.noUnderline,
               cellLink,
               align,
+              on('click', (event) => {
+                if (window.navigation?.transition && event.currentTarget.href === location.href) event.preventDefault();
+              }),
             ]}
           >
             {label}
