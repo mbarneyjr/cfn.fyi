@@ -24,8 +24,8 @@ export const resourceChanges = table({
     ordinal: c.integer(),
     version: c.text(),
     status: c.enum(['added', 'modified', 'removed']),
-    block: c.text(),
-    block_sha256: c.text(),
+    diff: c.text(),
+    diff_sha256: c.text(),
   },
 });
 

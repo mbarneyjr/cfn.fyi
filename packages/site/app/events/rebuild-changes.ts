@@ -44,7 +44,7 @@ async function write(db: Database, operations: Operation[]) {
   let batch: Operation[] = [];
   let bytes = 0;
   for (const operation of operations) {
-    const size = 'row' in operation ? operation.row.block.length : 0;
+    const size = 'row' in operation ? operation.row.diff.length : 0;
     if (batch.length === batchRows || (batch.length && bytes + size > batchBytes)) {
       await writeBatch(db, batch);
       batch = [];
@@ -98,7 +98,7 @@ export async function rebuildChanges({ db, archive }: RebuildOptions) {
           resource_type: resourceChanges.resource_type,
           ordinal: resourceChanges.ordinal,
           version: resourceChanges.version,
-          block_sha256: resourceChanges.block_sha256,
+          diff_sha256: resourceChanges.diff_sha256,
         })
         .all()
     ).map((row) => [`${row.ordinal}|${row.resource_type}`, row]),
@@ -109,26 +109,26 @@ export async function rebuildChanges({ db, archive }: RebuildOptions) {
   let previous: Specification | undefined;
   for (const version of comparable) {
     const current = parseSpecification(gunzipSync(await archive.read(version.version)));
-    for (const block of compare(previous, current).blocks) {
-      latest.set(block.name, {
-        resource_type: block.name,
+    for (const diff of compare(previous, current)) {
+      latest.set(diff.name, {
+        resource_type: diff.name,
         latest_version: version.version,
-        latest_status: block.status,
+        latest_status: diff.status,
       });
-      const json = JSON.stringify(block);
-      const block_sha256 = createHash('sha256').update(json).digest('hex');
-      const key = `${version.ordinal}|${block.name}`;
+      const json = JSON.stringify(diff);
+      const diff_sha256 = createHash('sha256').update(json).digest('hex');
+      const key = `${version.ordinal}|${diff.name}`;
       const existing = stored.get(key);
       stored.delete(key);
-      if (existing?.block_sha256 === block_sha256) continue;
+      if (existing?.diff_sha256 === diff_sha256) continue;
       operations.push({
         row: {
-          resource_type: block.name,
+          resource_type: diff.name,
           ordinal: version.ordinal,
           version: version.version,
-          status: block.status,
-          block: json,
-          block_sha256,
+          status: diff.status,
+          diff: json,
+          diff_sha256,
         },
       });
       changed.add(version.version);

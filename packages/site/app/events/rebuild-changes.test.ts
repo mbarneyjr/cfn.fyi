@@ -55,7 +55,7 @@ describe('rebuildChanges', () => {
         ['AWS::Test::New', 'added'],
       ],
     );
-    assert.equal(JSON.parse(rows[1].block).name, 'AWS::Test::New');
+    assert.equal(JSON.parse(rows[1].diff).name, 'AWS::Test::New');
     const types = await db.query(resourceTypes).orderBy('resource_type', 'asc').all();
     assert.deepEqual(
       types.map((row) => [row.resource_type, row.latest_version, row.latest_status]),

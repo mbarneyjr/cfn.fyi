@@ -1,9 +1,10 @@
 import { css, type Handle } from 'remix/component';
-import type { Changelog, Status } from '#app/data/comparison.ts';
+import type { Status } from '#app/data/comparison.ts';
 import { routes } from '#app/routes.ts';
 import { Document } from '#app/ui/pages/lib/document.tsx';
 import { color, layout, space, text } from '#app/ui/public/styles.ts';
 import { Badge, ChangelogChanges } from './changes.tsx';
+import type { Changelog } from './lines.ts';
 import { ChangelogNavigation, type Neighbor, versionHref } from './public/navigation.tsx';
 
 interface ChangelogPageProps {

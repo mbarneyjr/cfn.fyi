@@ -1,7 +1,8 @@
 import { css, type Handle } from 'remix/component';
-import type { Block, Changelog, Line, Mark, Segment, Status } from '#app/data/comparison.ts';
+import type { Status } from '#app/data/comparison.ts';
 import { routes } from '#app/routes.ts';
 import { border, color, layout, space, text } from '#app/ui/public/styles.ts';
+import type { Block, Changelog, Line, Mark, Segment } from './lines.ts';
 import { ExpandControls } from './public/expand-controls.tsx';
 
 const tone = (token: string, wash?: string) => css({ color: token, '--link-color': token, backgroundColor: wash });

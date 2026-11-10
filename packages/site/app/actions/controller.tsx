@@ -1,10 +1,11 @@
 import { createController } from 'remix/router';
 
 import { assets } from '#app/assets.ts';
-import type { Block, Status } from '#app/data/comparison.ts';
+import type { Diff, Status } from '#app/data/comparison.ts';
 import { resourceChanges, resourceTypes, type Version, versions } from '#app/data/tables.ts';
 import type { AppContext } from '#app/router.ts';
 import { routes } from '#app/routes.ts';
+import { render } from '#app/ui/pages/changelog/lines.ts';
 import { ChangelogPage } from '#app/ui/pages/changelog/page.tsx';
 import type { Neighbor } from '#app/ui/pages/changelog/public/navigation.tsx';
 import { origin } from '#app/ui/pages/lib/document.tsx';
@@ -61,7 +62,7 @@ async function changelog(context: AppContext, rows: Version[], path?: string, re
     .where({ ordinal: current.ordinal, ...(resourceType && { resource_type: resourceType }) })
     .all();
   const blocks = changes
-    .map((change) => JSON.parse(change.block) as Block)
+    .map((change) => render(JSON.parse(change.diff) as Diff))
     .sort((a, b) => a.name.localeCompare(b.name));
   return context.render(
     <ChangelogPage

@@ -1,7 +1,8 @@
 import * as assert from 'remix/assert';
 import { describe, it } from 'remix/test';
 
-import { compare, type Line } from './comparison.ts';
+import { type Line, render } from '#app/ui/pages/changelog/lines.ts';
+import { compare } from './comparison.ts';
 import type { Specification } from './specification.ts';
 
 const text = (line: Line) =>
@@ -59,8 +60,29 @@ const after: Specification = {
 };
 
 describe('compare', () => {
-  const changelog = compare(before, after);
-  const block = (name: string) => changelog.blocks.find((candidate) => candidate.name === name);
+  const diffs = compare(before, after);
+  const block = (name: string) => diffs.filter((diff) => diff.name === name).map(render)[0];
+
+  it('records the before and after state of each changed property', () => {
+    const thing = diffs.find((diff) => diff.name === 'AWS::Test::Thing');
+    const name = thing?.properties.find((property) => property.name === 'Name');
+    assert.equal(name?.status, 'modified');
+    assert.deepEqual(name?.before?.property, { PrimitiveType: 'String', Required: false, UpdateType: 'Mutable' });
+    assert.deepEqual(name?.after?.property, { PrimitiveType: 'String', Required: true, UpdateType: 'Immutable' });
+    const rule = thing?.properties.find((property) => property.name === 'Rule');
+    assert.equal(rule?.after?.shape.type, 'AWS::Test::Thing.Rule');
+    assert.deepEqual(
+      rule?.children?.map((child) => [child.name, child.status, child.children === undefined]),
+      [
+        ['Statement', 'modified', true],
+        ['Values', 'modified', true],
+      ],
+    );
+    assert.deepEqual(
+      thing?.types.map((type) => [type.name, type.status]),
+      [['Orphan', 'modified']],
+    );
+  });
 
   it('renders a modified resource as YAML with marked changes', () => {
     assert.deepEqual(block('AWS::Test::Thing')?.lines.map(text), [
@@ -98,13 +120,13 @@ describe('compare', () => {
     const statuses = compare(before, {
       ...after,
       ResourceTypes: { ...after.ResourceTypes, 'AWS::Test::New': { Properties: {} } },
-    }).blocks.map((candidate) => candidate.status);
+    }).map((candidate) => candidate.status);
     assert.deepEqual(statuses, ['added', 'modified', 'removed']);
   });
 
   it('renders every resource as an addition for the first version', () => {
     const first = compare(undefined, after);
-    assert.ok(first.blocks.every((candidate) => candidate.status === 'added'));
-    assert.ok(first.blocks[0].lines.map(text).includes('+   Config.Arn: String'));
+    assert.ok(first.every((candidate) => candidate.status === 'added'));
+    assert.ok(render(first[0]).lines.map(text).includes('+   Config.Arn: String'));
   });
 });

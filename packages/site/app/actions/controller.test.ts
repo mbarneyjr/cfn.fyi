@@ -12,11 +12,13 @@ const base = routes.index.href();
 
 const index = (path: string) => router.fetch(new URL(path, 'http://localhost'));
 
-const block = {
-  id: 'aws-test-thing',
+const diff = {
   name: 'AWS::Test::Thing',
   status: 'added',
-  lines: [{ depth: 0, mark: '+', key: { text: 'Type' }, value: { text: 'AWS::Test::Thing' } }],
+  after: {},
+  properties: [],
+  attributes: [],
+  types: [],
 };
 
 describe('changelog', () => {
@@ -42,13 +44,13 @@ describe('changelog', () => {
       },
     ]);
     const change = {
-      resource_type: block.name,
+      resource_type: diff.name,
       status: 'added' as const,
-      block: JSON.stringify(block),
-      block_sha256: 'hash',
+      diff: JSON.stringify(diff),
+      diff_sha256: 'hash',
     };
     await db.create(resourceTypes, {
-      resource_type: block.name,
+      resource_type: diff.name,
       latest_version: '2.0.0',
       latest_status: 'modified',
     });
@@ -59,7 +61,7 @@ describe('changelog', () => {
         ordinal: 2000000,
         version: '2.0.0',
         status: 'modified',
-        block: JSON.stringify({ ...block, status: 'modified' }),
+        diff: JSON.stringify({ ...diff, status: 'modified' }),
       },
       { ...change, ordinal: 3000000, version: '3.0.0' },
     ]);
@@ -142,7 +144,7 @@ describe('changelog', () => {
   });
 
   it('renders the latest change to a resource type with navigation through its changes only', async () => {
-    const response = await index(routes.resource.href({ type: block.name }));
+    const response = await index(routes.resource.href({ type: diff.name }));
     assert.equal(response.status, 200);
     const html = await response.text();
     assert.match(html, /<title>cfn\.fyi · AWS::Test::Thing changes<\/title>/);

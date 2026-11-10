@@ -3,8 +3,8 @@ let
   databasePort = 44110;
   environment = {
     DATABASE_URL = "postgres://127.0.0.1:${toString databasePort}/cfnfyi";
-    ARCHIVE_DIRECTORY = "\${PWD}/.data/archive";
   };
+  withArchive = command: "export ARCHIVE_DIRECTORY=\"$PWD/.data/archive\"; ${command}";
 in
 {
   imports = [ inputs.process-compose-flake.flakeModule ];
@@ -27,12 +27,12 @@ in
         depends_on.database.condition = "process_healthy";
       };
       settings.processes.synchronize = {
-        command = "npm run synchronize --workspace @cfnfyi/site && npm run rebuild --workspace @cfnfyi/site";
+        command = withArchive "npm run synchronize --workspace @cfnfyi/site && npm run rebuild --workspace @cfnfyi/site";
         inherit environment;
         depends_on.migrate.condition = "process_completed_successfully";
       };
       settings.processes.site = {
-        command = "npm run hmr --workspace @cfnfyi/site";
+        command = withArchive "npm run hmr --workspace @cfnfyi/site";
         inherit environment;
         depends_on.migrate.condition = "process_completed_successfully";
       };
