@@ -145,14 +145,14 @@ describe('versionMessages', () => {
     diff_sha256: 'hash',
   });
 
-  it('groups the types by status with a count and links each type to its diff on the version page', () => {
+  it('groups the types by status and links each type to its diff on the version page', () => {
     const [message] = versionMessages('2.0.0', diffs.map(change), siteUrl);
     const texts = (message.blocks as { text: { text: string } }[]).map((block) => block.text.text);
     assert.deepEqual(texts, [
       '*AWS CloudFormation resource specification <https://dev.cfn.fyi/version/2.0.0|2.0.0>*\n3 resource types changed',
-      '*Added (1)*\n• <https://dev.cfn.fyi/version/2.0.0#aws-test-a|`AWS::Test::A`>',
-      '*Modified (1)*\n• <https://dev.cfn.fyi/version/2.0.0#aws-test-b|`AWS::Test::B`>',
-      '*Removed (1)*\n• <https://dev.cfn.fyi/version/2.0.0#aws-test-c|`AWS::Test::C`>',
+      '*Added*\n• <https://dev.cfn.fyi/version/2.0.0#aws-test-a|`AWS::Test::A`>',
+      '*Modified*\n• <https://dev.cfn.fyi/version/2.0.0#aws-test-b|`AWS::Test::B`>',
+      '*Removed*\n• <https://dev.cfn.fyi/version/2.0.0#aws-test-c|`AWS::Test::C`>',
     ]);
   });
 
