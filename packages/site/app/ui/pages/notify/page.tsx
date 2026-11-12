@@ -19,10 +19,10 @@ export function NotifyPage(handle: Handle<{ slack?: SlackOutcome }>) {
     const description =
       'Get a message when cfn.fyi publishes a new version of the CloudFormation resource specification.';
     return (
-      <Document title="cfn.fyi · Notify me" description={description} path={routes.notify.href()}>
+      <Document title="cfn.fyi · Notify Me" description={description} path={routes.notify.href()}>
         <div mix={[layout.stack, space.gap4]}>
           <header mix={[layout.stack, space.gap3]}>
-            <h1 mix={text.title}>Notify me</h1>
+            <h1 mix={text.title}>Notify Me</h1>
             <p mix={color.muted}>{description}</p>
           </header>
           {slack && (

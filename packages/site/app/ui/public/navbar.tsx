@@ -35,7 +35,7 @@ export const Navbar = clientEntry(import.meta.url, function Navbar(handle: Handl
           ) : (
             <a href={routes.resources.href()}>Resources</a>
           )}
-          <a href={routes.notify.href()}>Notify me</a>
+          <a href={routes.notify.href()}>Notify Me</a>
           <ThemeControl />
         </div>
       </div>

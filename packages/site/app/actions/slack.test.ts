@@ -56,7 +56,7 @@ describe('slack', () => {
 
   it('links the navbar to the notify page', async () => {
     const html = await (await router.fetch(new URL('/missing', 'http://localhost'))).text();
-    assert.match(html, /<a [^>]*href="\/notify"[^>]*>Notify me/);
+    assert.match(html, /<a [^>]*href="\/notify"[^>]*>Notify Me/);
   });
 
   it('links the notify page to the installation as a document navigation', async () => {
