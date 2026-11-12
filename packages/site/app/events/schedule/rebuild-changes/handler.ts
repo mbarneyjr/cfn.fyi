@@ -9,6 +9,7 @@ import { DatabaseConnection } from '#app/database/connection.ts';
 import { type ResourceChangeOperation, ResourceChangesTable } from '#app/database/resource-changes.ts';
 import { type ResourceType, ResourceTypesTable } from '#app/database/resource-types.ts';
 import { type Version, VersionsTable } from '#app/database/versions.ts';
+import { Logger } from '#app/logger.ts';
 
 interface RebuildOptions {
   archive: Archive;
@@ -97,9 +98,10 @@ export function invalidationPaths(comparable: Version[], changed: string[]) {
   return [...paths];
 }
 
-export async function handler() {
+export async function handler(lambdaEvent: unknown) {
+  Logger.info('lambda event received', { lambdaEvent });
   const { changed, comparable, latestReady, typesWritten } = await rebuildChanges({ archive: createArchive() });
-  console.log(JSON.stringify({ message: 'rebuilt changes', changed, latestReady, typesWritten }));
+  Logger.info('rebuilt changes', { changed, latestReady, typesWritten });
   if (latestReady) await SQS.sendMessage('versionReady', latestReady);
   if (changed.length || typesWritten) await CloudFront.invalidate(invalidationPaths(comparable, changed));
   return { changed };

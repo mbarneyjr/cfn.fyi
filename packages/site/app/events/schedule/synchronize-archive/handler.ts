@@ -5,6 +5,7 @@ import { type Archive, createArchive } from '#app/data/archive.ts';
 import { listSourceVersions, ordinal, requestSource } from '#app/data/specification.ts';
 import { DatabaseConnection } from '#app/database/connection.ts';
 import { type Version, VersionsTable } from '#app/database/versions.ts';
+import { Logger } from '#app/logger.ts';
 
 const recheckCount = 20;
 const downloadConcurrency = 8;
@@ -111,9 +112,10 @@ export async function synchronizeArchive({ archive, now = new Date() }: Synchron
   return result;
 }
 
-export async function handler() {
+export async function handler(lambdaEvent: unknown) {
+  Logger.info('lambda event received', { lambdaEvent });
   const result = await synchronizeArchive({ archive: createArchive() });
-  console.log(JSON.stringify({ message: 'synchronized archive', ...result }));
+  Logger.info('synchronized archive', result);
   if (result.archived.length || result.pending) await Lambda.invokeAsynchronously('rebuildChanges');
   return result;
 }

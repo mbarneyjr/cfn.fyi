@@ -4,6 +4,7 @@ import { createRouter, type Middleware, type MiddlewareContext } from 'remix/rou
 import controller from './actions/controller.tsx';
 import { assets } from './assets.ts';
 import { retryOnConflict } from './database/connection.ts';
+import { Logger } from './logger.ts';
 import { routes } from './routes.ts';
 
 const renderMiddleware = render({ assets });
@@ -23,8 +24,11 @@ const edgeCache: Middleware = async (_context, next) => {
   return response;
 };
 
+const logContext: Middleware = (context, next) =>
+  Logger.run({ method: context.request.method, path: context.url.pathname }, next);
+
 export const router = createRouter<AppContext>({
-  middleware: [compression(), edgeCache, renderMiddleware],
+  middleware: [logContext, compression(), edgeCache, renderMiddleware],
 });
 router.map(routes, controller);
 const { fetch } = router;

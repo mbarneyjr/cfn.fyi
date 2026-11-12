@@ -364,6 +364,8 @@ Resources:
       Role: !GetAtt EventFunctionRole.Arn
       MemorySize: 1024
       Timeout: 600
+      LoggingConfig:
+        LogFormat: JSON
       Environment:
         Variables:
           NODE_ENV: production
@@ -389,6 +391,8 @@ Resources:
       Role: !GetAtt EventFunctionRole.Arn
       MemorySize: 2048
       Timeout: 900
+      LoggingConfig:
+        LogFormat: JSON
       Environment:
         Variables:
           NODE_ENV: production
@@ -428,6 +432,8 @@ Resources:
       Role: !GetAtt EventFunctionRole.Arn
       MemorySize: 512
       Timeout: 60
+      LoggingConfig:
+        LogFormat: JSON
       Environment:
         Variables:
           NODE_ENV: production
@@ -474,6 +480,8 @@ Resources:
       Role: !GetAtt EventFunctionRole.Arn
       MemorySize: 512
       Timeout: 900
+      LoggingConfig:
+        LogFormat: JSON
       Environment:
         Variables:
           NODE_ENV: production
@@ -546,6 +554,154 @@ Resources:
         HostedZoneId: Z2FDTNDATAQYW2
       Name: !Ref DomainName
       HostedZoneId: !Ref HostedZoneId
+
+  SiteErrorRateAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: IsProduction
+    Properties:
+      AlarmName: !Sub ${ApplicationName}-${EnvironmentName}-site-error-rate
+      AlarmDescription: More than 5 percent of site requests return a 5xx response
+      Namespace: AWS/CloudFront
+      MetricName: 5xxErrorRate
+      Dimensions:
+        - Name: DistributionId
+          Value: !Ref SiteDistribution
+        - Name: Region
+          Value: Global
+      Statistic: Average
+      Period: 60
+      EvaluationPeriods: 5
+      DatapointsToAlarm: 3
+      ComparisonOperator: GreaterThanThreshold
+      Threshold: 5
+      TreatMissingData: notBreaching
+
+  VersionReadyDeadLetterAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: IsProduction
+    Properties:
+      AlarmName: !Sub ${ApplicationName}-${EnvironmentName}-version-ready-dead-letters
+      AlarmDescription: A ready version failed subscriber enumeration and moved to the dead-letter queue
+      Namespace: AWS/SQS
+      MetricName: ApproximateNumberOfMessagesVisible
+      Dimensions:
+        - Name: QueueName
+          Value: !GetAtt VersionReadyDeadLetterQueue.QueueName
+      Statistic: Maximum
+      Period: 300
+      EvaluationPeriods: 1
+      ComparisonOperator: GreaterThanThreshold
+      Threshold: 0
+      TreatMissingData: notBreaching
+
+  DeliveryDeadLetterAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: IsProduction
+    Properties:
+      AlarmName: !Sub ${ApplicationName}-${EnvironmentName}-delivery-dead-letters
+      AlarmDescription: A notification delivery failed before its claim and moved to the dead-letter queue
+      Namespace: AWS/SQS
+      MetricName: ApproximateNumberOfMessagesVisible
+      Dimensions:
+        - Name: QueueName
+          Value: !GetAtt DeliveryDeadLetterQueue.QueueName
+      Statistic: Maximum
+      Period: 300
+      EvaluationPeriods: 1
+      ComparisonOperator: GreaterThanThreshold
+      Threshold: 0
+      TreatMissingData: notBreaching
+
+  RebuildErrorAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: IsProduction
+    Properties:
+      AlarmName: !Sub ${ApplicationName}-${EnvironmentName}-rebuild-errors
+      AlarmDescription: The rebuild failed, so pending versions stay hidden until the next rebuild
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref RebuildChangesFunction
+      Statistic: Sum
+      Period: 3600
+      EvaluationPeriods: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      Threshold: 1
+      TreatMissingData: notBreaching
+
+  RebuildDurationAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: IsProduction
+    Properties:
+      AlarmName: !Sub ${ApplicationName}-${EnvironmentName}-rebuild-duration
+      AlarmDescription: The rebuild used more than 80 percent of its 900 second timeout
+      Namespace: AWS/Lambda
+      MetricName: Duration
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref RebuildChangesFunction
+      Statistic: Maximum
+      Period: 3600
+      EvaluationPeriods: 1
+      ComparisonOperator: GreaterThanThreshold
+      Threshold: 720000
+      TreatMissingData: notBreaching
+
+  SynchronizeErrorAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: IsProduction
+    Properties:
+      AlarmName: !Sub ${ApplicationName}-${EnvironmentName}-synchronize-errors
+      AlarmDescription: The synchronize failed in each of the last 15 minutes, so new versions are not archived
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref SynchronizeArchiveFunction
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 3
+      DatapointsToAlarm: 3
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      Threshold: 1
+      TreatMissingData: notBreaching
+
+  SynchronizeInvocationAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: IsProduction
+    Properties:
+      AlarmName: !Sub ${ApplicationName}-${EnvironmentName}-synchronize-not-running
+      AlarmDescription: The synchronize schedule did not invoke the function in the last 15 minutes
+      Namespace: AWS/Lambda
+      MetricName: Invocations
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref SynchronizeArchiveFunction
+      Statistic: Sum
+      Period: 900
+      EvaluationPeriods: 1
+      ComparisonOperator: LessThanThreshold
+      Threshold: 1
+      TreatMissingData: breaching
+
+  DeliveryBacklogAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: IsProduction
+    Properties:
+      AlarmName: !Sub ${ApplicationName}-${EnvironmentName}-delivery-backlog
+      AlarmDescription: The oldest notification delivery has waited more than one hour
+      Namespace: AWS/SQS
+      MetricName: ApproximateAgeOfOldestMessage
+      Dimensions:
+        - Name: QueueName
+          Value: !GetAtt DeliveryQueue.QueueName
+      Statistic: Maximum
+      Period: 300
+      EvaluationPeriods: 1
+      ComparisonOperator: GreaterThanThreshold
+      Threshold: 3600
+      TreatMissingData: notBreaching
 
 
 Outputs:

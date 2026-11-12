@@ -7,6 +7,7 @@ import { authorizeUrl, noStore, receiveEvent, saveInstallation } from '#app/data
 import { ResourceChangesTable } from '#app/database/resource-changes.ts';
 import { ResourceTypesTable } from '#app/database/resource-types.ts';
 import { type Version, VersionsTable } from '#app/database/versions.ts';
+import { Logger } from '#app/logger.ts';
 import type { AppContext } from '#app/router.ts';
 import { routes } from '#app/routes.ts';
 import { SlackWebApi } from '#app/slack/web-api.ts';
@@ -41,7 +42,7 @@ async function installSlack(context: AppContext): Promise<SlackOutcome> {
     await saveInstallation(await SlackWebApi.exchangeCode(code));
     return 'installed';
   } catch (error) {
-    console.error('slack installation failed', error);
+    Logger.error('slack installation failed', { error });
     return 'failed';
   }
 }

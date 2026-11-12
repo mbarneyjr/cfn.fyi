@@ -3,6 +3,7 @@ import { Config } from '#app/config.ts';
 import { versionMessages } from '#app/data/slack-messages.ts';
 import { ResourceChangesTable } from '#app/database/resource-changes.ts';
 import { SlackInstallationsTable } from '#app/database/slack-installations.ts';
+import { Logger } from '#app/logger.ts';
 import { SlackWebApi } from '#app/slack/web-api.ts';
 import { queueWrapper } from '../queue-wrapper.ts';
 
@@ -34,12 +35,12 @@ export async function sendNotification(delivery: Delivery, siteUrl: string) {
     }
     return 'sent';
   } catch (error) {
-    console.error(JSON.stringify({ message: 'notification failed', delivery, error: String(error) }));
+    Logger.error('notification failed', { delivery, error });
     return 'failed';
   }
 }
 
 export const handler = queueWrapper(deliverySchema, async (delivery) => {
   const outcome = await sendNotification(delivery, Config.notifications().siteUrl);
-  console.log(JSON.stringify({ message: 'notification', outcome, delivery }));
+  Logger.info('notification processed', { outcome, delivery });
 });

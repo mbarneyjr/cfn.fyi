@@ -2,6 +2,7 @@ import { createHmac, timingSafeEqual } from 'node:crypto';
 import { array, type InferOutput, object, optional, parseSafe, string } from 'remix/data-schema';
 import { Config } from '#app/config.ts';
 import { SlackInstallationsTable } from '#app/database/slack-installations.ts';
+import { Logger } from '#app/logger.ts';
 import type { SlackAccessGrant } from '#app/slack/web-api.ts';
 
 const eventPayloadSchema = object({
@@ -48,9 +49,7 @@ export async function receiveEvent(request: Request) {
   }
   if (payload.type === 'event_callback' && payload.team_id && revokesBot(payload.event)) {
     await SlackInstallationsTable.delete(payload.team_id);
-    console.log(
-      JSON.stringify({ message: 'installation removed', team_id: payload.team_id, event: payload.event?.type }),
-    );
+    Logger.info('installation removed', { teamId: payload.team_id, eventType: payload.event?.type });
   }
   return new Response(null, { headers: noStore });
 }

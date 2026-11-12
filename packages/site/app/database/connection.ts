@@ -4,6 +4,7 @@ import pg from 'pg';
 import type { Database } from 'remix/data-table';
 import { createPostgresDatabase } from 'remix/data-table/postgres';
 import { Config } from '#app/config.ts';
+import { Logger } from '#app/logger.ts';
 
 function poolConfig(): pg.PoolConfig {
   const { endpoint, url, user, region } = Config.database();
@@ -23,7 +24,7 @@ function poolConfig(): pg.PoolConfig {
 
 export function createPool() {
   const pool = new pg.Pool(poolConfig());
-  pool.on('error', (error) => console.error('database pool error', error));
+  pool.on('error', (error) => Logger.error('database pool error', { error }));
   return pool;
 }
 
