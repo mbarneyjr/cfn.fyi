@@ -1,0 +1,90 @@
+{
+  "$schema": "https://raw.githubusercontent.com/aws-cloudformation/cloudformation-cli/refs/heads/master/src/rpdk/core/data/schema/provider.definition.schema.v1.json",
+  "properties": {
+    "TypeArn": {
+      "type": "string",
+      "pattern": "^arn:aws[A-Za-z0-9-]{0,64}:cloudformation:[A-Za-z0-9-]{1,64}:([0-9]{12})?:type\\/resource\\/.+$",
+      "description": "The ARN of the resource type, without a version. Give TypeArn or TypeName. A change replaces the configuration."
+    },
+    "TypeName": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9]{2,64}::[A-Za-z0-9]{2,64}::[A-Za-z0-9]{2,64}$",
+      "description": "The name of the resource type, such as Slack::Apps::App. Give TypeArn or TypeName. A change replaces the configuration."
+    },
+    "Configuration": {
+      "type": "string",
+      "description": "The configuration data for the type in this account and region, as a JSON string. It must match the typeConfiguration schema of the type."
+    },
+    "ConfigurationAlias": {
+      "type": "string",
+      "enum": [
+        "default"
+      ],
+      "description": "The alias of the configuration. Resource types support only default."
+    },
+    "ConfigurationArn": {
+      "type": "string",
+      "description": "The ARN of the configuration in this account and region."
+    }
+  },
+  "required": [
+    "Configuration"
+  ],
+  "additionalProperties": false,
+  "typeName": "Utils::CloudFormation::ResourceTypeConfig",
+  "description": "The configuration data of a registered resource type in this account and region. A delete leaves the configuration in place, because the registry has no operation that removes it.",
+  "documentationUrl": "https://docs.aws.amazon.com/AWSCloudFormation/latest/APIReference/API_SetTypeConfiguration.html",
+  "tagging": {
+    "taggable": false
+  },
+  "oneOf": [
+    {
+      "required": [
+        "TypeArn",
+        "Configuration"
+      ]
+    },
+    {
+      "required": [
+        "TypeName",
+        "Configuration"
+      ]
+    }
+  ],
+  "readOnlyProperties": [
+    "/properties/ConfigurationArn"
+  ],
+  "createOnlyProperties": [
+    "/properties/TypeArn",
+    "/properties/TypeName",
+    "/properties/ConfigurationAlias"
+  ],
+  "primaryIdentifier": [
+    "/properties/ConfigurationArn"
+  ],
+  "handlers": {
+    "create": {
+      "permissions": [
+        "cloudformation:SetTypeConfiguration",
+        "cloudformation:BatchDescribeTypeConfigurations"
+      ]
+    },
+    "read": {
+      "permissions": [
+        "cloudformation:BatchDescribeTypeConfigurations"
+      ]
+    },
+    "update": {
+      "permissions": [
+        "cloudformation:SetTypeConfiguration",
+        "cloudformation:BatchDescribeTypeConfigurations"
+      ]
+    },
+    "delete": {
+      "permissions": [
+        "cloudformation:BatchDescribeTypeConfigurations"
+      ]
+    }
+  },
+  "definitions": {}
+}

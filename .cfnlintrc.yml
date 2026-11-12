@@ -1,3 +1,5 @@
+registry_schemas:
+  - ./.schemas
 templates:
   - infra/*/*.yml
 include_checks:

@@ -1,6 +1,8 @@
+import { array, boolean, enum_, object, optional, parse, record, type Schema, string } from 'remix/data-schema';
+
 export type UpdateType = 'Mutable' | 'Immutable' | 'Conditional';
-export type PrimitiveItemType = 'String' | 'Long' | 'Integer' | 'Double' | 'Boolean' | 'Timestamp';
-export type PrimitiveType = PrimitiveItemType | 'Json';
+export type PrimitiveItemType = 'String' | 'Long' | 'Integer' | 'Double' | 'Boolean' | 'Timestamp' | 'Json';
+export type PrimitiveType = PrimitiveItemType | 'Map';
 
 export interface Property {
   Documentation?: string;
@@ -13,9 +15,18 @@ export interface Property {
   DuplicatesAllowed?: boolean;
 }
 
+export interface DeletionPolicy {
+  Default: string;
+  AllowedValues: string[];
+}
+
 export interface Definition extends Property {
   Properties?: Record<string, Property>;
   Attributes?: Record<string, Property>;
+  AdditionalProperties?: boolean;
+  AllowCreationPolicy?: string;
+  AllowUpdatePolicy?: string;
+  DeletionPolicy?: DeletionPolicy;
 }
 
 export interface Specification {
@@ -53,4 +64,43 @@ export async function requestSource(version: string, method: 'GET' | 'HEAD') {
   return fetch(fileUrl(version), { method });
 }
 
-export const parseSpecification = (json: Uint8Array) => JSON.parse(Buffer.from(json).toString('utf8')) as Specification;
+const updateTypeSchema = enum_(['Mutable', 'Immutable', 'Conditional']);
+const primitiveItemTypeSchema = enum_(['String', 'Long', 'Integer', 'Double', 'Boolean', 'Timestamp', 'Json']);
+const primitiveTypeSchema = enum_(['String', 'Long', 'Integer', 'Double', 'Boolean', 'Timestamp', 'Json', 'Map']);
+
+const propertySchema: Schema<unknown, Property> = object({
+  Documentation: optional(string()),
+  Required: optional(boolean()),
+  UpdateType: optional(updateTypeSchema),
+  PrimitiveType: optional(primitiveTypeSchema),
+  Type: optional(string()),
+  ItemType: optional(string()),
+  PrimitiveItemType: optional(primitiveItemTypeSchema),
+  DuplicatesAllowed: optional(boolean()),
+});
+
+const definitionSchema: Schema<unknown, Definition> = object({
+  Documentation: optional(string()),
+  Required: optional(boolean()),
+  UpdateType: optional(updateTypeSchema),
+  PrimitiveType: optional(primitiveTypeSchema),
+  Type: optional(string()),
+  ItemType: optional(string()),
+  PrimitiveItemType: optional(primitiveItemTypeSchema),
+  DuplicatesAllowed: optional(boolean()),
+  Properties: optional(record(string(), propertySchema)),
+  Attributes: optional(record(string(), propertySchema)),
+  AdditionalProperties: optional(boolean()),
+  AllowCreationPolicy: optional(string()),
+  AllowUpdatePolicy: optional(string()),
+  DeletionPolicy: optional(object({ Default: string(), AllowedValues: array(string()) })),
+});
+
+const specificationSchema: Schema<unknown, Specification> = object({
+  ResourceSpecificationVersion: string(),
+  ResourceTypes: record(string(), definitionSchema),
+  PropertyTypes: record(string(), definitionSchema),
+});
+
+export const parseSpecification = (json: Uint8Array) =>
+  parse(specificationSchema, JSON.parse(Buffer.from(json).toString('utf8')));

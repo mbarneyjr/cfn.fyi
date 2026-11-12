@@ -3,7 +3,7 @@ import { parseArgs } from 'node:util';
 import type pg from 'pg';
 import { loadMigrations } from 'remix/data-table/migrations/node';
 import { createPostgresDatabase } from 'remix/data-table/postgres';
-import { createPool } from '#app/data/database.ts';
+import { createPool } from '#app/database/connection.ts';
 
 const lockStatement = /^(set lock_timeout|select pg_advisory_(un)?lock)/;
 const roleArn = /^arn:aws[\w-]*:iam::\d{12}:role\/[\w+=,.@/-]+$/;
@@ -62,7 +62,10 @@ try {
   console.log(`applied ${applied.length} migrations, reverted ${reverted.length}`);
   if (direction === 'up' && !values['dry-run']) {
     const { SITE_FUNCTION_ROLE_ARN, EVENT_FUNCTION_ROLE_ARN } = process.env;
-    if (SITE_FUNCTION_ROLE_ARN) await grantRole(pool, 'cfnfyi_reader', SITE_FUNCTION_ROLE_ARN, ['select']);
+    if (SITE_FUNCTION_ROLE_ARN) {
+      await grantRole(pool, 'cfnfyi_reader', SITE_FUNCTION_ROLE_ARN, ['select']);
+      await pool.query('grant insert, update, delete on slack_installations to cfnfyi_reader');
+    }
     if (EVENT_FUNCTION_ROLE_ARN)
       await grantRole(pool, 'cfnfyi_writer', EVENT_FUNCTION_ROLE_ARN, ['select', 'insert', 'update', 'delete']);
   }

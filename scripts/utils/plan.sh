@@ -22,7 +22,7 @@ source ./scripts/utils/load-config.sh "${ENVIRONMENT_NAME}"
 STACK_NAME="${APPLICATION_NAME}-${ENVIRONMENT_NAME}-${INFRA_COMPONENT}"
 
 # Convert infra component name to uppercase for environment variable lookup
-COMPONENT_ENV_VAR_NAME="$(echo "${INFRA_COMPONENT}" | tr '[:lower:]' '[:upper:]')_ENVIRONMENT_NAME"
+COMPONENT_ENV_VAR_NAME="$(echo "${INFRA_COMPONENT}" | tr '[:lower:]-' '[:upper:]_')_ENVIRONMENT_NAME"
 COMPONENT_ENV_VALUE="${!COMPONENT_ENV_VAR_NAME:-${ENVIRONMENT_NAME}}"
 if [[ "${COMPONENT_ENV_VALUE}" != "${ENVIRONMENT_NAME}" ]]; then
   echo "[${STACK_NAME}] skipping plan, not configured to deploy ${INFRA_COMPONENT}"

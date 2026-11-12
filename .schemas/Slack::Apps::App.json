@@ -1,0 +1,1021 @@
+{
+  "$schema": "https://raw.githubusercontent.com/aws-cloudformation/cloudformation-cli/refs/heads/master/src/rpdk/core/data/schema/provider.definition.schema.v1.json",
+  "properties": {
+    "Manifest": {
+      "$ref": "#/definitions/Manifest"
+    },
+    "TeamId": {
+      "type": "string",
+      "description": "The team to create the app in. Only for an organization-level configuration token. A change replaces the app."
+    },
+    "Icon": {
+      "type": "string",
+      "pattern": "^(s3|https):\\/\\/",
+      "description": "The app icon, as an s3:// URI or a public https:// URL. The image must be square, 512 to 2000 pixels. The provider sets the icon at create and when the value changes."
+    },
+    "CredentialsSecretId": {
+      "type": "string",
+      "description": "Name or ARN of a Secrets Manager secret that the template owns. The provider writes the app credentials to it as JSON with the keys ClientId, ClientSecret, SigningSecret, and VerificationToken, at create and when this value changes. The provider does not create or delete the secret."
+    },
+    "AppId": {
+      "type": "string",
+      "description": "The ID of the app."
+    },
+    "ClientId": {
+      "type": "string",
+      "description": "The OAuth client ID of the app. Slack returns it only at create, so the provider stores it as a SecureString parameter at /internal/cfn-resource-providers/slack-apps-app/<AppId>/ClientId."
+    },
+    "OauthAuthorizeUrl": {
+      "type": "string",
+      "description": "The OAuth authorization URL for the scopes at create. It does not change when the scopes change. Slack returns it only at create, so the provider stores it as a SecureString parameter at /internal/cfn-resource-providers/slack-apps-app/<AppId>/OauthAuthorizeUrl."
+    }
+  },
+  "required": [
+    "Manifest"
+  ],
+  "additionalProperties": false,
+  "typeName": "Slack::Apps::App",
+  "description": "A Slack app, managed with the App Manifest API.",
+  "documentationUrl": "https://docs.slack.dev/reference/app-manifest",
+  "tagging": {
+    "taggable": false
+  },
+  "readOnlyProperties": [
+    "/properties/AppId",
+    "/properties/ClientId",
+    "/properties/OauthAuthorizeUrl"
+  ],
+  "writeOnlyProperties": [
+    "/properties/Icon",
+    "/properties/TeamId",
+    "/properties/CredentialsSecretId"
+  ],
+  "createOnlyProperties": [
+    "/properties/TeamId"
+  ],
+  "primaryIdentifier": [
+    "/properties/AppId"
+  ],
+  "replacementStrategy": "create_then_delete",
+  "handlers": {
+    "create": {
+      "permissions": [
+        "secretsmanager:GetSecretValue",
+        "secretsmanager:PutSecretValue",
+        "kms:Decrypt",
+        "kms:GenerateDataKey",
+        "ssm:PutParameter",
+        "kms:Encrypt",
+        "s3:GetObject",
+        "ssm:DeleteParameters"
+      ]
+    },
+    "read": {
+      "permissions": [
+        "secretsmanager:GetSecretValue",
+        "secretsmanager:PutSecretValue",
+        "kms:Decrypt",
+        "kms:GenerateDataKey",
+        "ssm:GetParametersByPath"
+      ]
+    },
+    "update": {
+      "permissions": [
+        "secretsmanager:GetSecretValue",
+        "secretsmanager:PutSecretValue",
+        "kms:Decrypt",
+        "kms:GenerateDataKey",
+        "s3:GetObject",
+        "ssm:GetParametersByPath"
+      ]
+    },
+    "delete": {
+      "permissions": [
+        "secretsmanager:GetSecretValue",
+        "secretsmanager:PutSecretValue",
+        "kms:Decrypt",
+        "kms:GenerateDataKey",
+        "ssm:DeleteParameters"
+      ]
+    }
+  },
+  "definitions": {
+    "Manifest": {
+      "type": "object",
+      "properties": {
+        "Metadata": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/Metadata"
+            }
+          ]
+        },
+        "DisplayInformation": {
+          "$ref": "#/definitions/DisplayInformation"
+        },
+        "Features": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/Features"
+            }
+          ]
+        },
+        "OauthConfig": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/OauthConfig"
+            }
+          ]
+        },
+        "Settings": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/Settings"
+            }
+          ]
+        },
+        "AppDirectory": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/AppDirectory"
+            }
+          ]
+        },
+        "Compliance": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/Compliance"
+            }
+          ]
+        },
+        "McpServers": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "The MCP servers, keyed by a server key of 1 to 25 characters. Maximum 30.",
+          "maxProperties": 30,
+          "patternProperties": {
+            "^.{1,25}$": {
+              "$ref": "#/definitions/McpServer"
+            }
+          }
+        }
+      },
+      "required": [
+        "DisplayInformation"
+      ],
+      "additionalProperties": false,
+      "description": "The app manifest. Property names are the PascalCase form of the manifest fields. Slack replaces the full configuration on each update."
+    },
+    "Metadata": {
+      "type": "object",
+      "properties": {
+        "MajorVersion": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991,
+          "description": "The major version of the manifest schema."
+        },
+        "MinorVersion": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991,
+          "description": "The minor version of the manifest schema."
+        }
+      },
+      "additionalProperties": false,
+      "description": "Settings that describe the manifest. Maps to _metadata."
+    },
+    "DisplayInformation": {
+      "type": "object",
+      "properties": {
+        "Name": {
+          "type": "string",
+          "maxLength": 35,
+          "description": "The name of the app. Maximum 35 characters."
+        },
+        "Description": {
+          "type": "string",
+          "maxLength": 140,
+          "description": "A short description of the app for users. Maximum 140 characters."
+        },
+        "LongDescription": {
+          "type": "string",
+          "minLength": 175,
+          "maxLength": 4000,
+          "description": "A long description of the app. 175 to 4000 characters."
+        },
+        "BackgroundColor": {
+          "type": "string",
+          "pattern": "^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$",
+          "description": "The background color of the app as a 3-digit or 6-digit hex value, such as #1d3557. You cannot remove it after you set it, only change it."
+        }
+      },
+      "required": [
+        "Name"
+      ],
+      "additionalProperties": false,
+      "description": "Settings that describe the appearance of the app in Slack."
+    },
+    "Features": {
+      "type": "object",
+      "properties": {
+        "AppHome": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/AppHome"
+            }
+          ]
+        },
+        "AgentView": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/AgentView"
+            }
+          ]
+        },
+        "AssistantView": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/AssistantView"
+            }
+          ]
+        },
+        "BotUser": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/BotUser"
+            }
+          ]
+        },
+        "CodeChannels": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/CodeChannels"
+            }
+          ]
+        },
+        "RichPreviews": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/RichPreviews"
+            }
+          ]
+        },
+        "Search": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/Search"
+            }
+          ]
+        },
+        "Shortcuts": {
+          "maxItems": 10,
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Shortcut"
+          },
+          "description": "The shortcuts. Maximum 10: 5 global and 5 message shortcuts."
+        },
+        "SlashCommands": {
+          "maxItems": 50,
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SlashCommand"
+          },
+          "description": "The slash commands. Maximum 50."
+        },
+        "UnfurlDomains": {
+          "maxItems": 5,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "description": "The domains for link unfurling. Maximum 5 domains of 255 characters."
+        }
+      },
+      "additionalProperties": false,
+      "description": "Settings for the Features section of the app configuration."
+    },
+    "AppHome": {
+      "type": "object",
+      "properties": {
+        "HomeTabEnabled": {
+          "type": "boolean",
+          "description": "Enables the Home tab."
+        },
+        "MessagesTabEnabled": {
+          "type": "boolean",
+          "description": "Enables the Messages tab."
+        },
+        "MessagesTabReadOnlyEnabled": {
+          "type": "boolean",
+          "description": "Makes the Messages tab read-only, so that users cannot send messages to the app."
+        }
+      },
+      "additionalProperties": false,
+      "description": "The App Home configuration."
+    },
+    "AgentView": {
+      "type": "object",
+      "properties": {
+        "AgentDescription": {
+          "type": "string",
+          "maxLength": 300,
+          "description": "The description of the agent. Maximum 300 characters."
+        },
+        "Actions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/AgentAction"
+          },
+          "description": "The actions in the agent container."
+        },
+        "SuggestedPrompts": {
+          "maxItems": 4,
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SuggestedPrompt"
+          },
+          "description": "Fixed prompts for users. Maximum 4."
+        }
+      },
+      "required": [
+        "AgentDescription"
+      ],
+      "additionalProperties": false,
+      "description": "The agent messaging experience, in the Messages tab. New apps must use this instead of AssistantView. A change from AssistantView to AgentView cannot be reversed."
+    },
+    "AgentAction": {
+      "type": "object",
+      "properties": {
+        "Name": {
+          "type": "string",
+          "description": "The name of the action."
+        },
+        "Description": {
+          "type": "string",
+          "description": "The description of the action."
+        }
+      },
+      "required": [
+        "Name",
+        "Description"
+      ],
+      "additionalProperties": false,
+      "description": "An action in the agent container."
+    },
+    "SuggestedPrompt": {
+      "type": "object",
+      "properties": {
+        "Title": {
+          "type": "string",
+          "description": "The title of the prompt."
+        },
+        "Message": {
+          "type": "string",
+          "description": "The message that Slack sends when a user selects the prompt."
+        }
+      },
+      "required": [
+        "Title",
+        "Message"
+      ],
+      "additionalProperties": false,
+      "description": "A fixed prompt that Slack shows to users."
+    },
+    "AssistantView": {
+      "type": "object",
+      "properties": {
+        "AssistantDescription": {
+          "type": "string",
+          "maxLength": 300,
+          "description": "The description of the assistant. Maximum 300 characters."
+        },
+        "Actions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/AgentAction"
+          },
+          "description": "The actions in the assistant container."
+        },
+        "SuggestedPrompts": {
+          "maxItems": 4,
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SuggestedPrompt"
+          },
+          "description": "Fixed prompts for users. Maximum 4."
+        }
+      },
+      "required": [
+        "AssistantDescription"
+      ],
+      "additionalProperties": false,
+      "description": "The older assistant messaging experience, with separate Chat and History tabs. Slack will deprecate it."
+    },
+    "BotUser": {
+      "type": "object",
+      "properties": {
+        "DisplayName": {
+          "type": "string",
+          "maxLength": 80,
+          "description": "The display name of the bot user. Maximum 80 characters. Slack makes the bot username from this value, and rejects a reserved username."
+        },
+        "AlwaysOnline": {
+          "type": "boolean",
+          "description": "Shows the bot user as online at all times."
+        }
+      },
+      "required": [
+        "DisplayName"
+      ],
+      "additionalProperties": false,
+      "description": "The bot user configuration."
+    },
+    "CodeChannels": {
+      "type": "object",
+      "properties": {
+        "Enabled": {
+          "type": "boolean",
+          "description": "Enables code channels. The app then receives app_mention events and can call the agents.conversations methods."
+        },
+        "SlashCommandUrl": {
+          "type": "string",
+          "maxLength": 3000,
+          "pattern": "^https:\\/\\/",
+          "description": "The URL that receives the slash commands that the agent registers at runtime. Not necessary for Socket Mode or hosted apps. Maximum 3000 characters."
+        },
+        "SuppressMentionEphemeral": {
+          "type": "boolean",
+          "description": "Stops the ephemeral prompt when a user mentions the app. Default true."
+        }
+      },
+      "additionalProperties": false,
+      "description": "The code channels configuration."
+    },
+    "RichPreviews": {
+      "type": "object",
+      "properties": {
+        "AllowSameOrigin": {
+          "type": "boolean",
+          "description": "Renders Work Object embeds with the allow-same-origin sandbox token."
+        },
+        "DomainAllowlist": {
+          "maxItems": 20,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "description": "The domains for Work Object embeds. Maximum 20 domains of 255 characters."
+        },
+        "EntityTypes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "The entity types for rich previews."
+        },
+        "IsActive": {
+          "type": "boolean",
+          "description": "Enables rich previews."
+        },
+        "Slug": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/RichPreviewSlug"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "description": "The rich previews configuration."
+    },
+    "RichPreviewSlug": {
+      "type": "object",
+      "properties": {
+        "HideDisplayId": {
+          "type": "boolean",
+          "description": "Removes the display ID from the slug of a task."
+        }
+      },
+      "additionalProperties": false,
+      "description": "The slug configuration."
+    },
+    "Search": {
+      "type": "object",
+      "properties": {
+        "SearchFunctionCallbackId": {
+          "type": "string",
+          "description": "The callback ID of the function that searches for items."
+        },
+        "SearchFiltersFunctionCallbackId": {
+          "type": "string",
+          "description": "The callback ID of the function that gives the search filters."
+        },
+        "SlackbotMetadata": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/SlackbotMetadata"
+            }
+          ]
+        }
+      },
+      "required": [
+        "SearchFunctionCallbackId"
+      ],
+      "additionalProperties": false,
+      "description": "The enterprise search configuration."
+    },
+    "SlackbotMetadata": {
+      "type": "object",
+      "properties": {
+        "Description": {
+          "type": "string",
+          "description": "The description of the search connector for Slackbot."
+        },
+        "Examples": {
+          "maxItems": 5,
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Example uses. Maximum 5."
+        },
+        "ExampleQuery": {
+          "type": "string",
+          "description": "An example query."
+        }
+      },
+      "additionalProperties": false,
+      "description": "Settings that tell Slackbot how to use the search connector."
+    },
+    "Shortcut": {
+      "type": "object",
+      "properties": {
+        "Name": {
+          "type": "string",
+          "maxLength": 24,
+          "description": "The name of the shortcut. Maximum 24 characters."
+        },
+        "Type": {
+          "type": "string",
+          "enum": [
+            "message",
+            "global"
+          ],
+          "description": "The type of the shortcut."
+        },
+        "CallbackId": {
+          "type": "string",
+          "maxLength": 255,
+          "description": "The callback ID of the shortcut. Maximum 255 characters."
+        },
+        "Description": {
+          "type": "string",
+          "maxLength": 150,
+          "description": "A short description of the shortcut. Maximum 150 characters."
+        }
+      },
+      "required": [
+        "Name",
+        "Type",
+        "CallbackId",
+        "Description"
+      ],
+      "additionalProperties": false,
+      "description": "A shortcut."
+    },
+    "SlashCommand": {
+      "type": "object",
+      "properties": {
+        "Command": {
+          "type": "string",
+          "maxLength": 32,
+          "pattern": "^\\/",
+          "description": "The slash command, with the leading /. Maximum 32 characters."
+        },
+        "Description": {
+          "type": "string",
+          "maxLength": 2000,
+          "description": "The description of the command that Slack shows to users. Maximum 2000 characters."
+        },
+        "Url": {
+          "type": "string",
+          "maxLength": 3000,
+          "pattern": "^https:\\/\\/",
+          "description": "The request URL of the command. Maximum 3000 characters."
+        },
+        "UsageHint": {
+          "type": "string",
+          "maxLength": 1000,
+          "description": "A hint about how to use the command. Maximum 1000 characters."
+        },
+        "ShouldEscape": {
+          "type": "boolean",
+          "description": "Escapes the channels, users, and links in the command text. Default false."
+        }
+      },
+      "required": [
+        "Command",
+        "Description"
+      ],
+      "additionalProperties": false,
+      "description": "A slash command."
+    },
+    "OauthConfig": {
+      "type": "object",
+      "properties": {
+        "RedirectUrls": {
+          "maxItems": 1000,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 2500
+          },
+          "description": "The OAuth redirect URLs. Maximum 1000 URLs of 2500 characters."
+        },
+        "Scopes": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/Scopes"
+            }
+          ]
+        },
+        "TokenManagementEnabled": {
+          "type": "boolean",
+          "description": "Enables token management."
+        },
+        "PkceEnabled": {
+          "type": "boolean",
+          "description": "Enables PKCE for the OAuth flow."
+        },
+        "IsEnterpriseManagedAuthSupported": {
+          "type": "boolean",
+          "description": "Enables enterprise-managed authorization. Requires OrgDeployEnabled."
+        }
+      },
+      "additionalProperties": false,
+      "description": "The OAuth configuration."
+    },
+    "Scopes": {
+      "type": "object",
+      "properties": {
+        "Bot": {
+          "maxItems": 255,
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "The bot scopes to request at installation. Maximum 255."
+        },
+        "BotOptional": {
+          "maxItems": 255,
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "The optional bot scopes. Each one must also be in Bot. Maximum 255."
+        },
+        "User": {
+          "maxItems": 255,
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "The user scopes to request at installation. Maximum 255."
+        },
+        "UserOptional": {
+          "maxItems": 255,
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "The optional user scopes. Each one must also be in User. Maximum 255."
+        }
+      },
+      "additionalProperties": false,
+      "description": "The permission scopes."
+    },
+    "Settings": {
+      "type": "object",
+      "properties": {
+        "AllowedIpAddressRanges": {
+          "maxItems": 20,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^\\d{1,3}(\\.\\d{1,3}){3}(\\/\\d{1,2})?$"
+          },
+          "description": "The IP addresses or CIDR ranges that can call the Slack API with the tokens of the app. Maximum 20."
+        },
+        "AppLevelTokenRotationEnabled": {
+          "type": "boolean",
+          "description": "Enables rotation of app-level tokens."
+        },
+        "EventSubscriptions": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/EventSubscriptions"
+            }
+          ]
+        },
+        "IncomingWebhooks": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/IncomingWebhooks"
+            }
+          ]
+        },
+        "Interactivity": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/Interactivity"
+            }
+          ]
+        },
+        "OrgDeployEnabled": {
+          "type": "boolean",
+          "description": "Enables organization-wide deployment. Required for enterprise-managed authorization, and when token management is disabled."
+        },
+        "SocketModeEnabled": {
+          "type": "boolean",
+          "description": "Enables Socket Mode."
+        },
+        "TokenRotationEnabled": {
+          "type": "boolean",
+          "description": "Enables token rotation."
+        },
+        "SiwsLinks": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/SiwsLinks"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "description": "Settings for the Settings section of the app configuration."
+    },
+    "EventSubscriptions": {
+      "type": "object",
+      "properties": {
+        "RequestUrl": {
+          "type": "string",
+          "maxLength": 3500,
+          "pattern": "^https:\\/\\/",
+          "description": "The Events API request URL. You must verify it in the app settings. Maximum 3500 characters."
+        },
+        "BotEvents": {
+          "maxItems": 100,
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "The event types for the bot. Maximum 100."
+        },
+        "UserEvents": {
+          "maxItems": 100,
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "The event types on behalf of authorized users. Maximum 100."
+        },
+        "MetadataSubscriptions": {
+          "maxItems": 20,
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/MetadataSubscription"
+          },
+          "description": "The message metadata subscriptions. Maximum 20."
+        }
+      },
+      "additionalProperties": false,
+      "description": "The Events API configuration."
+    },
+    "MetadataSubscription": {
+      "type": "object",
+      "properties": {
+        "AppId": {
+          "type": "string",
+          "description": "The ID of the app that sends the metadata events, or * for all apps."
+        },
+        "EventType": {
+          "type": "string",
+          "maxLength": 50,
+          "description": "The metadata event type. Maximum 50 characters."
+        }
+      },
+      "required": [
+        "AppId",
+        "EventType"
+      ],
+      "additionalProperties": false,
+      "description": "A subscription to message metadata events."
+    },
+    "IncomingWebhooks": {
+      "type": "object",
+      "properties": {
+        "IncomingWebhooksEnabled": {
+          "type": "boolean",
+          "description": "Enables incoming webhooks."
+        }
+      },
+      "additionalProperties": false,
+      "description": "The incoming webhooks configuration."
+    },
+    "Interactivity": {
+      "type": "object",
+      "properties": {
+        "IsEnabled": {
+          "type": "boolean",
+          "description": "Enables interactivity."
+        },
+        "RequestUrl": {
+          "type": "string",
+          "maxLength": 3500,
+          "pattern": "^https:\\/\\/",
+          "description": "The interactivity request URL. Maximum 3500 characters."
+        },
+        "MessageMenuOptionsUrl": {
+          "type": "string",
+          "maxLength": 3500,
+          "pattern": "^https:\\/\\/",
+          "description": "The options load URL for menus. Maximum 3500 characters."
+        }
+      },
+      "required": [
+        "IsEnabled"
+      ],
+      "additionalProperties": false,
+      "description": "The interactivity configuration."
+    },
+    "SiwsLinks": {
+      "type": "object",
+      "properties": {
+        "InitiateUri": {
+          "type": "string",
+          "maxLength": 3500,
+          "pattern": "^https:\\/\\/",
+          "description": "The initiate URI. Maximum 3500 characters."
+        }
+      },
+      "additionalProperties": false,
+      "description": "The SIWS links configuration."
+    },
+    "AppDirectory": {
+      "type": "object",
+      "properties": {
+        "AppDirectoryCategories": {
+          "maxItems": 3,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "description": "The Slack Marketplace categories. Maximum 3 categories of 255 characters."
+        },
+        "UseDirectInstall": {
+          "type": "boolean",
+          "description": "Uses direct install."
+        },
+        "DirectInstallUrl": {
+          "type": "string",
+          "maxLength": 255,
+          "pattern": "^https?:\\/\\/",
+          "description": "The URL of the install page. Maximum 255 characters."
+        },
+        "InstallationLandingPage": {
+          "type": "string",
+          "maxLength": 255,
+          "pattern": "^https?:\\/\\/",
+          "description": "The URL of the installation landing page. Maximum 255 characters."
+        },
+        "PrivacyPolicyUrl": {
+          "type": "string",
+          "maxLength": 500,
+          "pattern": "^https?:\\/\\/",
+          "description": "The URL of the privacy policy. Maximum 500 characters."
+        },
+        "SupportUrl": {
+          "type": "string",
+          "maxLength": 350,
+          "pattern": "^https?:\\/\\/",
+          "description": "The URL of the support page. Maximum 350 characters."
+        },
+        "SupportEmail": {
+          "type": "string",
+          "maxLength": 100,
+          "pattern": "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$",
+          "description": "The support email address. Maximum 100 characters."
+        },
+        "SupportedLanguages": {
+          "minItems": 1,
+          "maxItems": 50,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 50
+          },
+          "description": "The languages that the app supports. 1 to 50 languages of 50 characters."
+        },
+        "Pricing": {
+          "type": "string",
+          "maxLength": 30,
+          "description": "The pricing information. Maximum 30 characters."
+        }
+      },
+      "required": [
+        "InstallationLandingPage",
+        "PrivacyPolicyUrl",
+        "SupportUrl",
+        "SupportEmail",
+        "SupportedLanguages",
+        "Pricing"
+      ],
+      "additionalProperties": false,
+      "description": "The Slack Marketplace listing. Only for apps in the Slack Marketplace."
+    },
+    "Compliance": {
+      "type": "object",
+      "properties": {
+        "FedrampAuthorization": {
+          "type": "string",
+          "description": "The FedRAMP certification."
+        },
+        "DodSrgIlx": {
+          "type": "string",
+          "description": "The Department of Defense Cloud Computing Security Requirements Guide (SRG) impact level."
+        },
+        "ItarCompliant": {
+          "type": "string",
+          "description": "The ITAR compliance."
+        }
+      },
+      "additionalProperties": false,
+      "description": "The compliance certifications for GovSlack."
+    },
+    "McpServer": {
+      "type": "object",
+      "properties": {
+        "AuthType": {
+          "type": "string",
+          "enum": [
+            "dynamic_client_registration",
+            "no_auth",
+            "manual_auth",
+            "slack_identity_auth"
+          ],
+          "description": "The authentication type."
+        },
+        "Url": {
+          "type": "string",
+          "maxLength": 500,
+          "pattern": "^https:\\/\\/",
+          "description": "The URL of the MCP server. Maximum 500 characters."
+        },
+        "Description": {
+          "type": "string",
+          "maxLength": 80,
+          "description": "A short description of what the server lets Slackbot do. Maximum 80 characters."
+        },
+        "Headers": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "The HTTP headers to send to the server.",
+          "patternProperties": {
+            "^.+$": {
+              "type": "string"
+            }
+          }
+        },
+        "IconEmoji": {
+          "type": "string",
+          "maxLength": 100,
+          "description": "The emoji for the icon of the server, such as :robot_face:. Maximum 100 characters."
+        }
+      },
+      "required": [
+        "AuthType",
+        "Url"
+      ],
+      "additionalProperties": false,
+      "description": "An MCP server."
+    }
+  },
+  "typeConfiguration": {
+    "properties": {
+      "TokenSecretArn": {
+        "type": "string",
+        "pattern": "^arn:aws[a-z-]*:secretsmanager:[a-z0-9-]+:\\d{12}:secret:.+$",
+        "description": "ARN of a Secrets Manager secret with the value {\"RefreshToken\": \"xoxe-...\"}. The secret can be in another account. The provider rotates the token and writes the new token set to the secret, so every account and region that shares the secret can use the same configuration token."
+      }
+    },
+    "required": [
+      "TokenSecretArn"
+    ],
+    "additionalProperties": false
+  }
+}

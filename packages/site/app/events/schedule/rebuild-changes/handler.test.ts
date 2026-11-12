@@ -7,9 +7,11 @@ import { describe, it } from 'remix/test';
 
 import { DirectoryArchive } from '#app/data/archive.ts';
 import type { Specification } from '#app/data/specification.ts';
-import { resourceChanges, resourceTypes, versions } from '#app/data/tables.ts';
-import { createTestDatabase } from '../../db/test-database.ts';
-import { invalidationPaths, rebuildChanges } from './rebuild-changes.ts';
+import { resourceChanges } from '#app/database/resource-changes.ts';
+import { resourceTypes } from '#app/database/resource-types.ts';
+import { versions } from '#app/database/versions.ts';
+import { createTestDatabase } from '../../../../db/test-database.ts';
+import { invalidationPaths, rebuildChanges } from './handler.ts';
 
 const specification = (version: string, resources: string[]): Specification => ({
   ResourceSpecificationVersion: version,
@@ -41,10 +43,20 @@ async function setup(t: { after(callback: () => unknown): void }) {
 }
 
 describe('rebuildChanges', () => {
+  it('reports a ready version only when it is the latest version', async (t) => {
+    const { db, archive } = await setup(t);
+    await db.update(versions, '1.0.0', { status: 'pending' });
+    await db.update(versions, '3.0.0', { status: 'ready' });
+    const { latestReady } = await rebuildChanges({ archive });
+    assert.equal(latestReady, undefined);
+    assert.equal((await db.find(versions, '1.0.0'))?.status, 'ready');
+  });
+
   it('compares each archived version with the previous archived version', async (t) => {
     const { db, archive } = await setup(t);
-    const { changed } = await rebuildChanges({ db, archive });
+    const { changed, latestReady } = await rebuildChanges({ archive });
     assert.deepEqual(changed, ['1.0.0', '3.0.0']);
+    assert.deepEqual(latestReady, { version: '3.0.0', ordinal: 3000000 });
     assert.equal((await db.find(versions, '3.0.0'))?.status, 'ready');
     assert.equal((await db.find(versions, '2.0.0'))?.status, 'unavailable');
     const rows = await db.query(resourceChanges).where({ ordinal: 3000000 }).orderBy('resource_type', 'asc').all();
@@ -69,25 +81,25 @@ describe('rebuildChanges', () => {
 
   it('reports a type write when the changes are unchanged', async (t) => {
     const { db, archive } = await setup(t);
-    await rebuildChanges({ db, archive });
+    await rebuildChanges({ archive });
     await db.update(resourceTypes, 'AWS::Test::Kept', { latest_status: 'modified' });
-    const { changed, typesWritten } = await rebuildChanges({ db, archive });
+    const { changed, typesWritten } = await rebuildChanges({ archive });
     assert.deepEqual(changed, []);
     assert.equal(typesWritten, 1);
   });
 
   it('writes nothing when the archive is unchanged', async (t) => {
-    const { db, archive } = await setup(t);
-    await rebuildChanges({ db, archive });
-    const { changed } = await rebuildChanges({ db, archive });
+    const { archive } = await setup(t);
+    await rebuildChanges({ archive });
+    const { changed } = await rebuildChanges({ archive });
     assert.deepEqual(changed, []);
   });
 
   it('replaces and deletes rows after an archived version changes', async (t) => {
     const { db, archive, store } = await setup(t);
-    await rebuildChanges({ db, archive });
+    await rebuildChanges({ archive });
     await store(specification('3.0.0', ['AWS::Test::Kept', 'AWS::Test::Gone']));
-    const { changed } = await rebuildChanges({ db, archive });
+    const { changed } = await rebuildChanges({ archive });
     assert.deepEqual(changed, ['3.0.0']);
     assert.equal(await db.count(resourceChanges, { where: { ordinal: 3000000 } }), 0);
     assert.deepEqual(

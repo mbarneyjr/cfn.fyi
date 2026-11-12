@@ -1,24 +1,13 @@
-import type { Database } from 'remix/data-table';
-import { createPostgresDatabase } from 'remix/data-table/postgres';
 import { compression } from 'remix/middleware/compression';
 import { render } from 'remix/middleware/render';
-import { createContextKey, createRouter, type Middleware, type MiddlewareContext } from 'remix/router';
+import { createRouter, type Middleware, type MiddlewareContext } from 'remix/router';
 import controller from './actions/controller.tsx';
 import { assets } from './assets.ts';
-import { createPool, retryOnConflict } from './data/database.ts';
+import { retryOnConflict } from './database/connection.ts';
 import { routes } from './routes.ts';
 
-const databaseContext = createContextKey<Database>();
-
-const loadDatabase =
-  (db: Database): Middleware<{ key: typeof databaseContext; value: Database; property: 'db' }> =>
-  (context, next) => {
-    context.set(databaseContext, db, { property: 'db' });
-    return next();
-  };
-
 const renderMiddleware = render({ assets });
-export type AppContext = MiddlewareContext<[ReturnType<typeof loadDatabase>, typeof renderMiddleware]>;
+export type AppContext = MiddlewareContext<[typeof renderMiddleware]>;
 
 declare module 'remix' {
   interface RouterTypes {
@@ -34,14 +23,9 @@ const edgeCache: Middleware = async (_context, next) => {
   return response;
 };
 
-export function createAppRouter({ db }: { db: Database }) {
-  const router = createRouter<AppContext>({
-    middleware: [compression(), edgeCache, loadDatabase(db), renderMiddleware],
-  });
-  router.map(routes, controller);
-  const { fetch } = router;
-  router.fetch = (input, init) => retryOnConflict(() => fetch(input, init));
-  return router;
-}
-
-export const router = createAppRouter({ db: createPostgresDatabase(createPool()) });
+export const router = createRouter<AppContext>({
+  middleware: [compression(), edgeCache, renderMiddleware],
+});
+router.map(routes, controller);
+const { fetch } = router;
+router.fetch = (input, init) => retryOnConflict(() => fetch(input, init));

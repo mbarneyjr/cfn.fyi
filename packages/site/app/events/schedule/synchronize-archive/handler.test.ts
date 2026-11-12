@@ -6,9 +6,9 @@ import * as assert from 'remix/assert';
 import { describe, it } from 'remix/test';
 
 import { DirectoryArchive } from '#app/data/archive.ts';
-import { versions } from '#app/data/tables.ts';
-import { createTestDatabase } from '../../db/test-database.ts';
-import { synchronizeArchive } from './synchronize-archive.ts';
+import { versions } from '#app/database/versions.ts';
+import { createTestDatabase } from '../../../../db/test-database.ts';
+import { synchronizeArchive } from './handler.ts';
 
 interface SourceObject {
   body: string;
@@ -50,7 +50,7 @@ describe('synchronizeArchive', () => {
   it('archives new versions and records versions it cannot download', async (t) => {
     const { db, archive } = await setup(t);
     t.mock.method(globalThis, 'fetch', source({ '1.0.0': object('1.0.0', '"a"'), '2.0.0': undefined }));
-    const result = await synchronizeArchive({ db, archive });
+    const result = await synchronizeArchive({ archive });
     assert.deepEqual(result, { archived: ['1.0.0'], unavailable: ['2.0.0'], removed: [], pending: 1 });
     const row = await db.find(versions, '1.0.0');
     assert.equal(row?.status, 'pending');
@@ -63,9 +63,9 @@ describe('synchronizeArchive', () => {
   it('archives a recent version again when its ETag and content change', async (t) => {
     const { db, archive } = await setup(t);
     t.mock.method(globalThis, 'fetch', source({ '1.0.0': object('1.0.0', '"a"') }));
-    await synchronizeArchive({ db, archive });
+    await synchronizeArchive({ archive });
     t.mock.method(globalThis, 'fetch', source({ '1.0.0': object('1.0.0', '"b"', '{"AWS::Test::New":{}}') }));
-    const result = await synchronizeArchive({ db, archive });
+    const result = await synchronizeArchive({ archive });
     assert.deepEqual(result.archived, ['1.0.0']);
     const row = await db.find(versions, '1.0.0');
     assert.equal(row?.source_etag, '"b"');
@@ -75,9 +75,9 @@ describe('synchronizeArchive', () => {
   it('updates the ETag without archiving when the content is the same', async (t) => {
     const { db, archive } = await setup(t);
     t.mock.method(globalThis, 'fetch', source({ '1.0.0': object('1.0.0', '"a"') }));
-    await synchronizeArchive({ db, archive });
+    await synchronizeArchive({ archive });
     t.mock.method(globalThis, 'fetch', source({ '1.0.0': object('1.0.0', '"b"') }));
-    const result = await synchronizeArchive({ db, archive });
+    const result = await synchronizeArchive({ archive });
     assert.deepEqual(result.archived, []);
     assert.equal((await db.find(versions, '1.0.0'))?.source_etag, '"b"');
   });
@@ -85,9 +85,9 @@ describe('synchronizeArchive', () => {
   it('marks archived versions that the source no longer lists', async (t) => {
     const { db, archive } = await setup(t);
     t.mock.method(globalThis, 'fetch', source({ '1.0.0': object('1.0.0', '"a"'), '2.0.0': object('2.0.0', '"b"') }));
-    await synchronizeArchive({ db, archive });
+    await synchronizeArchive({ archive });
     t.mock.method(globalThis, 'fetch', source({ '2.0.0': object('2.0.0', '"b"') }));
-    const result = await synchronizeArchive({ db, archive });
+    const result = await synchronizeArchive({ archive });
     assert.deepEqual(result.removed, ['1.0.0']);
     assert.ok((await db.find(versions, '1.0.0'))?.removed_at);
   });
@@ -95,17 +95,17 @@ describe('synchronizeArchive', () => {
   it('does not count a ready version as pending', async (t) => {
     const { db, archive } = await setup(t);
     t.mock.method(globalThis, 'fetch', source({ '1.0.0': object('1.0.0', '"a"') }));
-    await synchronizeArchive({ db, archive });
+    await synchronizeArchive({ archive });
     await db.update(versions, '1.0.0', { status: 'ready' });
-    const result = await synchronizeArchive({ db, archive });
+    const result = await synchronizeArchive({ archive });
     assert.equal(result.pending, 0);
   });
 
   it('reports versions that an earlier run left pending', async (t) => {
-    const { db, archive } = await setup(t);
+    const { archive } = await setup(t);
     t.mock.method(globalThis, 'fetch', source({ '1.0.0': object('1.0.0', '"a"') }));
-    await synchronizeArchive({ db, archive });
-    const result = await synchronizeArchive({ db, archive });
+    await synchronizeArchive({ archive });
+    const result = await synchronizeArchive({ archive });
     assert.deepEqual(result.archived, []);
     assert.equal(result.pending, 1);
   });

@@ -1,15 +1,21 @@
+import { createCookie } from 'remix/cookie';
 import { createController } from 'remix/router';
 
 import { assets } from '#app/assets.ts';
-import type { Diff, Status } from '#app/data/comparison.ts';
-import { resourceChanges, resourceTypes, type Version, versions } from '#app/data/tables.ts';
+import type { Diff } from '#app/data/comparison.ts';
+import { authorizeUrl, noStore, receiveEvent, saveInstallation } from '#app/data/slack.ts';
+import { ResourceChangesTable } from '#app/database/resource-changes.ts';
+import { ResourceTypesTable } from '#app/database/resource-types.ts';
+import { type Version, VersionsTable } from '#app/database/versions.ts';
 import type { AppContext } from '#app/router.ts';
 import { routes } from '#app/routes.ts';
+import { SlackWebApi } from '#app/slack/web-api.ts';
 import { render } from '#app/ui/pages/changelog/lines.ts';
 import { ChangelogPage } from '#app/ui/pages/changelog/page.tsx';
 import type { Neighbor } from '#app/ui/pages/changelog/public/navigation.tsx';
 import { origin } from '#app/ui/pages/lib/document.tsx';
 import { NotFoundPage } from '#app/ui/pages/not-found/page.tsx';
+import { NotifyPage, type SlackOutcome, slackOutcomes } from '#app/ui/pages/notify/page.tsx';
 import { type ResourceSummary, ResourcesPage } from '#app/ui/pages/resources/page.tsx';
 
 const document = (body: string, type: string, maxAge: number) =>
@@ -17,50 +23,73 @@ const document = (body: string, type: string, maxAge: number) =>
     headers: { 'Content-Type': `${type}; charset=utf-8`, 'Cache-Control': `public, max-age=0, s-maxage=${maxAge}` },
   });
 
+const stateCookie = createCookie('slack_oauth_state', {
+  path: routes.slackCallback.href(),
+  httpOnly: true,
+  secure: true,
+  sameSite: 'Lax',
+  maxAge: 600,
+});
+
+async function installSlack(context: AppContext): Promise<SlackOutcome> {
+  const { searchParams } = context.url;
+  const expected = await stateCookie.parse(context.request.headers.get('Cookie'));
+  const code = searchParams.get('code');
+  if (searchParams.get('error')) return 'denied';
+  if (!expected || expected !== searchParams.get('state') || !code) return 'invalid';
+  try {
+    await saveInstallation(await SlackWebApi.exchangeCode(code));
+    return 'installed';
+  } catch (error) {
+    console.error('slack installation failed', error);
+    return 'failed';
+  }
+}
+
+async function slackCallback(context: AppContext) {
+  return new Response(null, {
+    status: 303,
+    headers: {
+      ...noStore,
+      Location: `${routes.notify.href()}?slack=${await installSlack(context)}`,
+      'Set-Cookie': await stateCookie.serialize('', { maxAge: 0 }),
+    },
+  });
+}
+
 const pageHeaders = { 'Cache-Control': 'public, max-age=0, s-maxage=300' };
 
 const notFound = (context: AppContext) =>
   context.render(<NotFoundPage path={context.url.pathname} />, { status: 404, headers: pageHeaders });
-
-const readyVersions = (context: AppContext) =>
-  context.db.query(versions).where({ status: 'ready' }).orderBy('ordinal', 'asc').all();
 
 const isoDate = (value: unknown) => (value ? new Date(value as string | Date).toISOString().slice(0, 10) : undefined);
 
 const neighbor = (row?: Version): Neighbor | undefined =>
   row && { version: row.version, date: isoDate(row.published_at) };
 
-async function resourceSummaries(context: AppContext) {
-  const rows = await context.db.query(resourceTypes).all();
+async function resourceSummaries() {
+  const rows = await ResourceTypesTable.list();
   return rows
     .map(
       (row): ResourceSummary => ({
         type: row.resource_type,
-        status: row.latest_status as Status,
+        status: row.latest_status,
         version: row.latest_version,
       }),
     )
     .sort((a, b) => a.type.localeCompare(b.type));
 }
 
-async function resourceVersions(context: AppContext, resourceType: string) {
-  const changes = await context.db
-    .query(resourceChanges)
-    .where({ resource_type: resourceType })
-    .select({ ordinal: resourceChanges.ordinal })
-    .all();
-  const ordinals = new Set(changes.map((change) => change.ordinal));
-  return (await readyVersions(context)).filter((row) => ordinals.has(row.ordinal));
+async function resourceVersions(resourceType: string) {
+  const ordinals = new Set(await ResourceChangesTable.listOrdinals(resourceType));
+  return (await VersionsTable.listReady()).filter((row) => ordinals.has(row.ordinal));
 }
 
 async function changelog(context: AppContext, rows: Version[], path?: string, resourceType?: string) {
   const index = path ? rows.findIndex((row) => row.version === path) : rows.length - 1;
   const current = rows[index];
   if (!current) return notFound(context);
-  const changes = await context.db
-    .query(resourceChanges)
-    .where({ ordinal: current.ordinal, ...(resourceType && { resource_type: resourceType }) })
-    .all();
+  const changes = await ResourceChangesTable.listByOrdinal(current.ordinal, resourceType);
   const blocks = changes
     .map((change) => render(JSON.parse(change.diff) as Diff))
     .sort((a, b) => a.name.localeCompare(b.name));
@@ -88,12 +117,13 @@ export default createController(routes, {
       const body = ['User-agent: *', 'Allow: /', '', `Sitemap: ${origin}${routes.sitemap.href()}`, ''].join('\n');
       return document(body, 'text/plain', 86400);
     },
-    async sitemap(context) {
-      const rows = await readyVersions(context);
-      const resources = await resourceSummaries(context);
+    async sitemap() {
+      const rows = await VersionsTable.listReady();
+      const resources = await resourceSummaries();
       const paths = [
         routes.index.href(),
         routes.resources.href(),
+        routes.notify.href(),
         ...resources.map((resource) => routes.resource.href({ type: resource.type })),
         ...rows
           .slice(0, -1)
@@ -109,18 +139,31 @@ export default createController(routes, {
       return document(body, 'application/xml', 3600);
     },
     async index(context) {
-      return changelog(context, await readyVersions(context));
+      return changelog(context, await VersionsTable.listReady());
     },
     async version(context) {
-      return changelog(context, await readyVersions(context), context.params.version);
+      return changelog(context, await VersionsTable.listReady(), context.params.version);
     },
     async resources(context) {
-      return context.render(<ResourcesPage resources={await resourceSummaries(context)} />, { headers: pageHeaders });
+      return context.render(<ResourcesPage resources={await resourceSummaries()} />, { headers: pageHeaders });
     },
     async resource(context) {
       const { type, version } = context.params;
-      return changelog(context, await resourceVersions(context, type), version, type);
+      return changelog(context, await resourceVersions(type), version, type);
     },
+    async slackInstall() {
+      const state = crypto.randomUUID();
+      return new Response(null, {
+        status: 302,
+        headers: { ...noStore, Location: authorizeUrl(state), 'Set-Cookie': await stateCookie.serialize(state) },
+      });
+    },
+    notify(context) {
+      const slack = slackOutcomes.find((outcome) => outcome === context.url.searchParams.get('slack'));
+      return context.render(<NotifyPage slack={slack} />, { headers: pageHeaders });
+    },
+    slackCallback,
+    slackEvents: (context) => receiveEvent(context.request),
     notFound,
   },
 });

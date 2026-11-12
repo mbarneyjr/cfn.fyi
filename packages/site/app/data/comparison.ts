@@ -1,6 +1,8 @@
 import type { Definition, Property, Specification } from './specification.ts';
 
-export type Status = 'added' | 'removed' | 'modified';
+export const statuses = ['added', 'modified', 'removed'] as const;
+
+export type Status = (typeof statuses)[number];
 
 export interface Shape {
   container?: 'List' | 'Map';
@@ -78,8 +80,6 @@ const sameConstraints = (a: Property, b: Property) =>
   a.Required === b.Required && a.UpdateType === b.UpdateType && a.DuplicatesAllowed === b.DuplicatesAllowed;
 
 export const expansion = (diff: PropertyDiff) => `${diff.before?.shape.type ?? ''}|${diff.after?.shape.type ?? ''}`;
-
-const statusOrder: Status[] = ['added', 'modified', 'removed'];
 
 class Comparison {
   readonly before: Specification;
@@ -184,22 +184,27 @@ class Comparison {
     this.expanded = new Set();
     const beforeDefinition = this.before.ResourceTypes[name];
     const afterDefinition = this.after.ResourceTypes[name];
-    const fields = (field: 'Properties' | 'Attributes') => {
-      if (status === 'removed') return [];
-      if (status === 'added') {
-        return Object.entries(afterDefinition[field] ?? {}).map(([property, value]) =>
-          this.full(this.after, name, property, value, 'added'),
-        );
-      }
-      return this.compareFields(name, name, beforeDefinition[field] ?? {}, afterDefinition[field] ?? {});
-    };
+    let properties: PropertyDiff[] = [];
+    let attributes: PropertyDiff[] = [];
+    if (status === 'added') {
+      properties = Object.entries(afterDefinition.Properties ?? {}).map(([property, value]) =>
+        this.full(this.after, name, property, value, 'added'),
+      );
+      attributes = Object.entries(afterDefinition.Attributes ?? {}).map(([attribute, value]) =>
+        this.full(this.after, name, attribute, value, 'added'),
+      );
+    }
+    if (status === 'modified') {
+      properties = this.compareFields(name, name, beforeDefinition.Properties ?? {}, afterDefinition.Properties ?? {});
+      attributes = this.compareFields(name, name, beforeDefinition.Attributes ?? {}, afterDefinition.Attributes ?? {});
+    }
     return {
       name,
       status,
       before: header(beforeDefinition),
       after: header(afterDefinition),
-      properties: fields('Properties'),
-      attributes: fields('Attributes'),
+      properties,
+      attributes,
       types: [],
     };
   }
@@ -217,15 +222,17 @@ class Comparison {
         'added',
       );
     }
-    const typeState = (definition: Definition): State => ({
-      property: { Documentation: definition.Documentation },
-      shape: { type: key, href: definition.Documentation },
-    });
     return {
       name,
       status: 'modified',
-      before: typeState(beforeDefinition),
-      after: typeState(afterDefinition),
+      before: {
+        property: { Documentation: beforeDefinition.Documentation },
+        shape: { type: key, href: beforeDefinition.Documentation },
+      },
+      after: {
+        property: { Documentation: afterDefinition.Documentation },
+        shape: { type: key, href: afterDefinition.Documentation },
+      },
       children: this.compareTypes(key, key),
     };
   }
@@ -273,7 +280,7 @@ class Comparison {
       });
     }
     return diffs.sort(
-      (a, b) => statusOrder.indexOf(a.status) - statusOrder.indexOf(b.status) || a.name.localeCompare(b.name),
+      (a, b) => statuses.indexOf(a.status) - statuses.indexOf(b.status) || a.name.localeCompare(b.name),
     );
   }
 }

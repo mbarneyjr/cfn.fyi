@@ -1,5 +1,5 @@
 import { css, type Handle } from 'remix/component';
-import type { Status } from '#app/data/comparison.ts';
+import { statuses } from '#app/data/comparison.ts';
 import { routes } from '#app/routes.ts';
 import { Document } from '#app/ui/pages/lib/document.tsx';
 import { color, layout, space, text } from '#app/ui/public/styles.ts';
@@ -17,8 +17,6 @@ interface ChangelogPageProps {
   next?: Neighbor;
   changelog: Changelog;
 }
-
-const statuses: Status[] = ['added', 'modified', 'removed'];
 
 const legend = css({ listStyle: 'none', padding: 0, margin: 0 });
 

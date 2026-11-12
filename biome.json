@@ -16,5 +16,10 @@
   "formatter": {
     "useEditorconfig": true,
     "lineWidth": 120
+  },
+  "linter": {
+    "rules": {
+      "complexity": { "noStaticOnlyClass": "off" }
+    }
   }
 }

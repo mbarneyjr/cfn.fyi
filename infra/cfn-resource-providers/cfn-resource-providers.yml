@@ -1,0 +1,32 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Custom Resource Registration
+
+
+Resources:
+  SlackAppsApp:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: ./template.yml
+      Parameters:
+        S3Path: s3://mbarneyjr-cfn-resource-providers/v0.0.6/Slack::Apps::App.zip
+        TypeName: Slack::Apps::App
+        Permissions: !Join
+          - ','
+          - - kms:Decrypt
+            - kms:Encrypt
+            - kms:GenerateDataKey
+            - s3:GetObject
+            - secretsmanager:GetSecretValue
+            - secretsmanager:PutSecretValue
+            - ssm:DeleteParameters
+            - ssm:GetParametersByPath
+            - ssm:PutParameter
+  SlackAppsAppConfig:
+    Type: Utils::CloudFormation::ResourceTypeConfig
+    DependsOn: SlackAppsApp
+    Properties:
+      TypeName: Slack::Apps::App
+      Configuration: |
+        {
+          "TokenSecretArn": "arn:aws:secretsmanager:us-east-1:830373723426:secret:slack/app-configuration-token-UkTxWO"
+        }

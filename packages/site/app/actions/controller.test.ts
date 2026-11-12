@@ -1,13 +1,15 @@
 import * as assert from 'remix/assert';
 import { after, before, describe, it } from 'remix/test';
 
-import { resourceChanges, resourceTypes, versions } from '#app/data/tables.ts';
-import { createAppRouter } from '#app/router.ts';
+import { DatabaseConnection } from '#app/database/connection.ts';
+import { resourceChanges } from '#app/database/resource-changes.ts';
+import { resourceTypes } from '#app/database/resource-types.ts';
+import { versions } from '#app/database/versions.ts';
+import { router } from '#app/router.ts';
 import { routes } from '#app/routes.ts';
 import { createTestDatabase } from '../../db/test-database.ts';
 
 const db = await createTestDatabase();
-const router = createAppRouter({ db });
 const base = routes.index.href();
 
 const index = (path: string) => router.fetch(new URL(path, 'http://localhost'));
@@ -83,7 +85,9 @@ describe('changelog', () => {
         return typeof value === 'function' ? value.bind(target) : value;
       },
     });
-    const response = await createAppRouter({ db: flaky }).fetch(new URL(base, 'http://localhost'));
+    DatabaseConnection.use(flaky);
+    const response = await router.fetch(new URL(base, 'http://localhost'));
+    DatabaseConnection.use(db);
     assert.equal(response.status, 200);
     assert.equal(failures, 1);
   });
@@ -208,6 +212,7 @@ describe('changelog', () => {
     assert.match(xml, /<loc>https:\/\/cfn\.fyi\/version\/1\.0\.0<\/loc>/);
     assert.match(xml, /<loc>https:\/\/cfn\.fyi\/<\/loc>/);
     assert.match(xml, /<loc>https:\/\/cfn\.fyi\/resources<\/loc>/);
+    assert.match(xml, /<loc>https:\/\/cfn\.fyi\/notify<\/loc>/);
     assert.match(xml, /<loc>https:\/\/cfn\.fyi\/resources\/AWS%3A%3ATest%3A%3AThing<\/loc>/);
     assert.doesNotMatch(xml, /1\.5\.0/);
     assert.doesNotMatch(xml, /<loc>https:\/\/cfn\.fyi\/version\/2\.0\.0<\/loc>/);

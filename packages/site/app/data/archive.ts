@@ -1,6 +1,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
-import { GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { S3 } from '#app/aws/s3.ts';
+import { Config } from '#app/config.ts';
 
 export abstract class Archive {
   abstract read(version: string): Promise<Uint8Array>;
@@ -32,33 +33,24 @@ export class DirectoryArchive extends Archive {
 
 export class BucketArchive extends Archive {
   private readonly bucket: string;
-  private readonly client: S3Client;
 
-  constructor(bucket: string, client = new S3Client({})) {
+  constructor(bucket: string) {
     super();
     this.bucket = bucket;
-    this.client = client;
   }
 
-  async read(version: string) {
-    const response = await this.client.send(new GetObjectCommand({ Bucket: this.bucket, Key: this.key(version) }));
-    return (await response.Body?.transformToByteArray()) ?? new Uint8Array();
+  read(version: string) {
+    return S3.getObject(this.bucket, this.key(version));
   }
 
   async write(version: string, body: Uint8Array) {
-    await this.client.send(
-      new PutObjectCommand({
-        Bucket: this.bucket,
-        Key: this.key(version),
-        Body: body,
-        ContentType: 'application/gzip',
-      }),
-    );
+    await S3.putObject(this.bucket, this.key(version), body, 'application/gzip');
   }
 }
 
 export function createArchive(): Archive {
-  if (process.env.ARCHIVE_BUCKET) return new BucketArchive(process.env.ARCHIVE_BUCKET);
-  if (process.env.ARCHIVE_DIRECTORY) return new DirectoryArchive(process.env.ARCHIVE_DIRECTORY);
+  const { bucket, directory } = Config.archive();
+  if (bucket) return new BucketArchive(bucket);
+  if (directory) return new DirectoryArchive(directory);
   throw new Error('Set ARCHIVE_BUCKET or ARCHIVE_DIRECTORY');
 }

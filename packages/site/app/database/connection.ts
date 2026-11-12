@@ -3,12 +3,12 @@ import { DsqlSigner } from '@aws-sdk/dsql-signer';
 import pg from 'pg';
 import type { Database } from 'remix/data-table';
 import { createPostgresDatabase } from 'remix/data-table/postgres';
+import { Config } from '#app/config.ts';
 
 function poolConfig(): pg.PoolConfig {
-  const endpoint = process.env.DATABASE_ENDPOINT;
-  if (!endpoint) return { connectionString: process.env.DATABASE_URL, max: 4 };
-  const user = process.env.DATABASE_USER ?? 'admin';
-  const signer = new DsqlSigner({ hostname: endpoint, region: process.env.AWS_REGION });
+  const { endpoint, url, user, region } = Config.database();
+  if (!endpoint) return { connectionString: url, max: 4 };
+  const signer = new DsqlSigner({ hostname: endpoint, region });
   return {
     host: endpoint,
     port: 5432,
@@ -21,8 +21,8 @@ function poolConfig(): pg.PoolConfig {
   };
 }
 
-export function createPool(overrides: pg.PoolConfig = {}) {
-  const pool = new pg.Pool({ ...poolConfig(), ...overrides });
+export function createPool() {
+  const pool = new pg.Pool(poolConfig());
   pool.on('error', (error) => console.error('database pool error', error));
   return pool;
 }
@@ -30,12 +30,12 @@ export function createPool(overrides: pg.PoolConfig = {}) {
 const conflictAttempts = 5;
 const conflictBaseDelay = 100;
 
-const isConflict = (error: unknown) => {
+function isConflict(error: unknown) {
   const { code, cause } = error as { code?: string; cause?: { code?: string } };
   return (code ?? cause?.code) === '40001';
-};
+}
 
-export async function retryOnConflict<result>(run: () => Promise<result>) {
+export async function retryOnConflict<Result>(run: () => Promise<Result>) {
   for (let attempt = 1; ; attempt++) {
     try {
       return await run();
@@ -46,11 +46,25 @@ export async function retryOnConflict<result>(run: () => Promise<result>) {
   }
 }
 
-export async function withDatabase<result>(run: (db: Database) => Promise<result>) {
-  const pool = createPool();
-  try {
-    return await run(createPostgresDatabase(pool));
-  } finally {
-    await pool.end();
+export class DatabaseConnection {
+  static #pool?: pg.Pool;
+  static #database?: Database;
+
+  static get database(): Database {
+    if (!DatabaseConnection.#database) {
+      DatabaseConnection.#pool = createPool();
+      DatabaseConnection.#database = createPostgresDatabase(DatabaseConnection.#pool);
+    }
+    return DatabaseConnection.#database;
+  }
+
+  static use(database: Database) {
+    DatabaseConnection.#database = database;
+  }
+
+  static async close() {
+    await DatabaseConnection.#pool?.end();
+    DatabaseConnection.#pool = undefined;
+    DatabaseConnection.#database = undefined;
   }
 }

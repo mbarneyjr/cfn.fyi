@@ -23,6 +23,9 @@ Parameters:
   CodeVersion:
     Type: String
     Description: S3 object version of the site deployment package
+  SlackIconUri:
+    Type: String
+    Description: s3:// URI of the Slack app icon
 
 
 Conditions:
@@ -71,6 +74,44 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub ${ApplicationName}-${EnvironmentName}
+
+  SlackCredentials:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Description: !Sub Credentials of the ${ApplicationName}-${EnvironmentName} Slack app, written by the Slack::Apps::App provider
+
+  SlackApp:
+    Type: Slack::Apps::App
+    Properties:
+      CredentialsSecretId: !Ref SlackCredentials
+      Icon: !Ref SlackIconUri
+      Manifest:
+        DisplayInformation:
+          Name: !Sub
+            - cfn.fyi${Suffix}
+            - Suffix: !If [IsProduction, '', !Sub ' (${EnvironmentName})']
+          Description: Notifications for new CloudFormation resource specification versions.
+        Features:
+          BotUser:
+            DisplayName: cfn.fyi
+        OauthConfig:
+          RedirectUrls:
+            - !Sub https://${DomainName}/slack/oauth/callback
+            - !If [IsProduction, !Ref AWS::NoValue, http://localhost:44100/slack/oauth/callback]
+          Scopes:
+            Bot:
+              - incoming-webhook
+              - chat:write
+              - chat:write.public
+        Settings:
+          EventSubscriptions:
+            RequestUrl: !Sub https://${DomainName}/slack/events
+            BotEvents:
+              - app_uninstalled
+              - tokens_revoked
+          OrgDeployEnabled: false
+          SocketModeEnabled: false
+          TokenRotationEnabled: false
 
   SiteFunctionRole:
     Type: AWS::IAM::Role
@@ -131,6 +172,11 @@ Resources:
           AWS_LAMBDA_NODEJS_ENTRYPOINT: packages/site/server.ts
           DATABASE_ENDPOINT: !Sub ${DatabaseCluster.Identifier}.dsql.${AWS::Region}.on.aws
           DATABASE_USER: cfnfyi_reader
+          SLACK_CLIENT_ID: !GetAtt SlackApp.ClientId
+          SLACK_AUTHORIZE_URL: !GetAtt SlackApp.OauthAuthorizeUrl
+          SLACK_CLIENT_SECRET: !Sub '{{resolve:secretsmanager:${SlackCredentials}:SecretString:ClientSecret}}'
+          SLACK_SIGNING_SECRET: !Sub '{{resolve:secretsmanager:${SlackCredentials}:SecretString:SigningSecret}}'
+          SLACK_SCOPES: !Join [',', !FindInMap [Slack, Scopes, Bot]]
 
   SiteFunctionEndpoint:
     Type: AWS::Lambda::WebFunctionEndpoint
@@ -206,6 +252,13 @@ Resources:
             CustomOriginConfig:
               OriginProtocolPolicy: https-only
               OriginReadTimeout: 60
+        CacheBehaviors:
+          - PathPattern: /slack/events
+            TargetOriginId: primary
+            ViewerProtocolPolicy: https-only
+            AllowedMethods: [GET, HEAD, OPTIONS, PUT, PATCH, POST, DELETE]
+            CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad # caching disabled
+            OriginRequestPolicyId: b689b0a8-53d0-40ab-baf2-68738e2966ac # all viewer except host header
         DefaultCacheBehavior:
           TargetOriginId: primary
           ViewerProtocolPolicy: redirect-to-https
@@ -286,6 +339,15 @@ Resources:
               - Effect: Allow
                 Action: cloudfront:CreateInvalidation
                 Resource: !Sub arn:${AWS::Partition}:cloudfront::${AWS::AccountId}:distribution/${SiteDistribution}
+              - Effect: Allow
+                Action:
+                  - sqs:SendMessage
+                  - sqs:ReceiveMessage
+                  - sqs:DeleteMessage
+                  - sqs:GetQueueAttributes
+                Resource:
+                  - !GetAtt VersionReadyQueue.Arn
+                  - !GetAtt DeliveryQueue.Arn
 
   SynchronizeArchiveFunction:
     Type: AWS::Lambda::Function
@@ -294,7 +356,7 @@ Resources:
       Runtime: nodejs24.x
       Architectures:
         - arm64
-      Handler: packages/site/app/events/synchronize-archive.handler
+      Handler: packages/site/app/events/schedule/synchronize-archive/handler.handler
       Code:
         S3Bucket: !Ref CodeBucket
         S3Key: !Ref CodeKey
@@ -319,7 +381,7 @@ Resources:
       Runtime: nodejs24.x
       Architectures:
         - arm64
-      Handler: packages/site/app/events/rebuild-changes.handler
+      Handler: packages/site/app/events/schedule/rebuild-changes/handler.handler
       Code:
         S3Bucket: !Ref CodeBucket
         S3Key: !Ref CodeKey
@@ -336,6 +398,99 @@ Resources:
           DATABASE_ENDPOINT: !Sub ${DatabaseCluster.Identifier}.dsql.${AWS::Region}.on.aws
           DATABASE_USER: cfnfyi_writer
           DISTRIBUTION_ID: !Ref SiteDistribution
+          VERSION_READY_QUEUE_URL: !Ref VersionReadyQueue
+
+  VersionReadyDeadLetterQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      MessageRetentionPeriod: 1209600
+
+  VersionReadyQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      VisibilityTimeout: 360
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt VersionReadyDeadLetterQueue.Arn
+        maxReceiveCount: 3
+
+  EnumerateSubscribersFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub ${ApplicationName}-${EnvironmentName}-enumerate-subscribers
+      Runtime: nodejs24.x
+      Architectures:
+        - arm64
+      Handler: packages/site/app/events/queue/enumerate-subscribers/handler.handler
+      Code:
+        S3Bucket: !Ref CodeBucket
+        S3Key: !Ref CodeKey
+        S3ObjectVersion: !Ref CodeVersion
+      Role: !GetAtt EventFunctionRole.Arn
+      MemorySize: 512
+      Timeout: 60
+      Environment:
+        Variables:
+          NODE_ENV: production
+          NODE_OPTIONS: --import remix/node-tsx
+          ENVIRONMENT_NAME: !Ref EnvironmentName
+          DATABASE_ENDPOINT: !Sub ${DatabaseCluster.Identifier}.dsql.${AWS::Region}.on.aws
+          DATABASE_USER: cfnfyi_writer
+          DELIVERY_QUEUE_URL: !Ref DeliveryQueue
+
+  EnumerateSubscribersEventSourceMapping:
+    Type: AWS::Lambda::EventSourceMapping
+    Properties:
+      EventSourceArn: !GetAtt VersionReadyQueue.Arn
+      FunctionName: !Ref EnumerateSubscribersFunction
+      BatchSize: 10
+      FunctionResponseTypes:
+        - ReportBatchItemFailures
+
+  DeliveryDeadLetterQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      MessageRetentionPeriod: 1209600
+
+  DeliveryQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      VisibilityTimeout: 5400
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt DeliveryDeadLetterQueue.Arn
+        maxReceiveCount: 3
+
+  SendNotificationFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub ${ApplicationName}-${EnvironmentName}-send-notification
+      Runtime: nodejs24.x
+      Architectures:
+        - arm64
+      Handler: packages/site/app/events/queue/send-notification/handler.handler
+      Code:
+        S3Bucket: !Ref CodeBucket
+        S3Key: !Ref CodeKey
+        S3ObjectVersion: !Ref CodeVersion
+      Role: !GetAtt EventFunctionRole.Arn
+      MemorySize: 512
+      Timeout: 900
+      Environment:
+        Variables:
+          NODE_ENV: production
+          NODE_OPTIONS: --import remix/node-tsx
+          ENVIRONMENT_NAME: !Ref EnvironmentName
+          DATABASE_ENDPOINT: !Sub ${DatabaseCluster.Identifier}.dsql.${AWS::Region}.on.aws
+          DATABASE_USER: cfnfyi_writer
+          SITE_URL: !Sub https://${DomainName}
+
+  SendNotificationEventSourceMapping:
+    Type: AWS::Lambda::EventSourceMapping
+    Properties:
+      EventSourceArn: !GetAtt DeliveryQueue.Arn
+      FunctionName: !Ref SendNotificationFunction
+      BatchSize: 1
+      FunctionResponseTypes:
+        - ReportBatchItemFailures
 
   SchedulerRole:
     Type: AWS::IAM::Role

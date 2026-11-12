@@ -65,48 +65,38 @@ export const ChangelogNavigation = clientEntry(
     return () => {
       const { resourceType, versions, version, date, previous, next } = handle.props;
       const subject = resourceType ? 'change' : 'version';
-      const link = (direction: 'previous' | 'next', neighbor?: Neighbor) => {
-        const label = <span mix={[text.label, color.brand]}>{direction === 'previous' ? '← Previous' : 'Next →'}</span>;
-        const align = direction === 'next' && text.alignEnd;
-        if (!neighbor) {
-          return (
-            <div mix={[area(direction), layout.stack, space.gap1, space.padBlock2, space.padInline3, align]}>
-              {label}
-              <span mix={color.muted}>
-                {direction === 'previous' ? `This is the first ${subject}` : `This is the latest ${subject}`}
-              </span>
-            </div>
-          );
-        }
-        return (
-          <a
-            href={versionHref(neighbor.version, resourceType)}
-            rel={direction === 'previous' ? 'prev' : 'next'}
-            mix={[
-              area(direction),
-              layout.stack,
-              space.gap1,
-              space.padBlock2,
-              space.padInline3,
-              text.noUnderline,
-              cellLink,
-              align,
-              on('click', (event) => {
-                if (window.navigation?.transition && event.currentTarget.href === location.href) event.preventDefault();
-              }),
-            ]}
-          >
-            {label}
-            <span mix={[text.bold, text.tabular, text.nowrap]}>{neighbor.version}</span>
-            <time datetime={neighbor.date} mix={[text.small, text.tabular, color.muted, dateSlot]}>
-              {neighbor.date}
-            </time>
-          </a>
-        );
-      };
       return (
         <nav aria-label="Specification versions" mix={[layout.cells, titleBlock]}>
-          {link('previous', previous)}
+          {previous ? (
+            <a
+              href={versionHref(previous.version, resourceType)}
+              rel="prev"
+              mix={[
+                area('previous'),
+                layout.stack,
+                space.gap1,
+                space.padBlock2,
+                space.padInline3,
+                text.noUnderline,
+                cellLink,
+                on('click', (event) => {
+                  if (window.navigation?.transition && event.currentTarget.href === location.href)
+                    event.preventDefault();
+                }),
+              ]}
+            >
+              <span mix={[text.label, color.brand]}>← Previous</span>
+              <span mix={[text.bold, text.tabular, text.nowrap]}>{previous.version}</span>
+              <time datetime={previous.date} mix={[text.small, text.tabular, color.muted, dateSlot]}>
+                {previous.date}
+              </time>
+            </a>
+          ) : (
+            <div mix={[area('previous'), layout.stack, space.gap1, space.padBlock2, space.padInline3]}>
+              <span mix={[text.label, color.brand]}>← Previous</span>
+              <span mix={color.muted}>This is the first {subject}</span>
+            </div>
+          )}
           <label
             mix={[
               area('version'),
@@ -136,7 +126,37 @@ export const ChangelogNavigation = clientEntry(
               {date && `issued ${date}`}
             </time>
           </label>
-          {link('next', next)}
+          {next ? (
+            <a
+              href={versionHref(next.version, resourceType)}
+              rel="next"
+              mix={[
+                area('next'),
+                layout.stack,
+                space.gap1,
+                space.padBlock2,
+                space.padInline3,
+                text.noUnderline,
+                cellLink,
+                text.alignEnd,
+                on('click', (event) => {
+                  if (window.navigation?.transition && event.currentTarget.href === location.href)
+                    event.preventDefault();
+                }),
+              ]}
+            >
+              <span mix={[text.label, color.brand]}>Next →</span>
+              <span mix={[text.bold, text.tabular, text.nowrap]}>{next.version}</span>
+              <time datetime={next.date} mix={[text.small, text.tabular, color.muted, dateSlot]}>
+                {next.date}
+              </time>
+            </a>
+          ) : (
+            <div mix={[area('next'), layout.stack, space.gap1, space.padBlock2, space.padInline3, text.alignEnd]}>
+              <span mix={[text.label, color.brand]}>Next →</span>
+              <span mix={color.muted}>This is the latest {subject}</span>
+            </div>
+          )}
         </nav>
       );
     };

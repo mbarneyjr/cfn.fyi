@@ -49,12 +49,13 @@ function typeChange(before: Shape, after: Shape) {
 
 function constraintChanges(before: Property, after: Property) {
   const changes: string[] = [];
-  const compare = (label: string, a: string, b: string) => {
-    if (a !== b) changes.push(`${label}: ${a} → ${b}`);
-  };
-  compare('Required', yesNo(before.Required), yesNo(after.Required));
-  compare('Update requires', updateType(before.UpdateType), updateType(after.UpdateType));
-  compare('Duplicates allowed', yesNo(before.DuplicatesAllowed), yesNo(after.DuplicatesAllowed));
+  const [requiredBefore, requiredAfter] = [yesNo(before.Required), yesNo(after.Required)];
+  if (requiredBefore !== requiredAfter) changes.push(`Required: ${requiredBefore} → ${requiredAfter}`);
+  const [updateBefore, updateAfter] = [updateType(before.UpdateType), updateType(after.UpdateType)];
+  if (updateBefore !== updateAfter) changes.push(`Update requires: ${updateBefore} → ${updateAfter}`);
+  const [duplicatesBefore, duplicatesAfter] = [yesNo(before.DuplicatesAllowed), yesNo(after.DuplicatesAllowed)];
+  if (duplicatesBefore !== duplicatesAfter)
+    changes.push(`Duplicates allowed: ${duplicatesBefore} → ${duplicatesAfter}`);
   return changes;
 }
 
@@ -81,7 +82,7 @@ const typeLine = (name: string, definition: Property, mark?: Mark): Line => ({
 const section = (name: string, body: Line[]): Line[] =>
   body.length ? [{ depth: 0, key: { text: name } }, ...body] : [];
 
-const slug = (text: string) =>
+export const slug = (text: string) =>
   text
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
