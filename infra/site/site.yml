@@ -176,7 +176,7 @@ Resources:
           SLACK_AUTHORIZE_URL: !GetAtt SlackApp.OauthAuthorizeUrl
           SLACK_CLIENT_SECRET: !Sub '{{resolve:secretsmanager:${SlackCredentials}:SecretString:ClientSecret}}'
           SLACK_SIGNING_SECRET: !Sub '{{resolve:secretsmanager:${SlackCredentials}:SecretString:SigningSecret}}'
-          SLACK_SCOPES: !Join [',', !FindInMap [Slack, Scopes, Bot]]
+          SLACK_SCOPES: !Join [',', !GetAtt SlackApp.BotScopes]
 
   SiteFunctionEndpoint:
     Type: AWS::Lambda::WebFunctionEndpoint

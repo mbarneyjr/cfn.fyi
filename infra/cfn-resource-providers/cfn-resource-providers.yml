@@ -8,7 +8,7 @@ Resources:
     Properties:
       TemplateURL: ./template.yml
       Parameters:
-        S3Path: s3://mbarneyjr-cfn-resource-providers/v0.0.6/Slack::Apps::App.zip
+        S3Path: s3://mbarneyjr-cfn-resource-providers/v0.0.7/Slack::Apps::App.zip
         TypeName: Slack::Apps::App
         Permissions: !Join
           - ','

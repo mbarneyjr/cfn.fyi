@@ -28,6 +28,13 @@
     "OauthAuthorizeUrl": {
       "type": "string",
       "description": "The OAuth authorization URL for the scopes at create. It does not change when the scopes change. Slack returns it only at create, so the provider stores it as a SecureString parameter at /internal/cfn-resource-providers/slack-apps-app/<AppId>/OauthAuthorizeUrl."
+    },
+    "BotScopes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "The bot scopes of the app. Equal to Manifest.OauthConfig.Scopes.Bot."
     }
   },
   "required": [
@@ -43,7 +50,8 @@
   "readOnlyProperties": [
     "/properties/AppId",
     "/properties/ClientId",
-    "/properties/OauthAuthorizeUrl"
+    "/properties/OauthAuthorizeUrl",
+    "/properties/BotScopes"
   ],
   "writeOnlyProperties": [
     "/properties/Icon",
