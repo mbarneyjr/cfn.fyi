@@ -217,4 +217,24 @@ describe('changelog', () => {
     assert.doesNotMatch(xml, /1\.5\.0/);
     assert.doesNotMatch(xml, /<loc>https:\/\/cfn\.fyi\/version\/2\.0\.0<\/loc>/);
   });
+
+  it('serves an RSS feed of the ready versions, newest first', async () => {
+    const response = await index(routes.feed.href());
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get('Content-Type'), 'application/rss+xml; charset=utf-8');
+    const xml = await response.text();
+    assert.match(xml, /<atom:link href="https:\/\/cfn\.fyi\/feed\.xml" rel="self"/);
+    const guids = [...xml.matchAll(/<guid isPermaLink="true">([^<]+)<\/guid>/g)].map((match) => match[1]);
+    assert.deepEqual(guids, [
+      'https://cfn.fyi/version/2.0.0',
+      'https://cfn.fyi/version/1.0.0',
+      'https://cfn.fyi/version/0.5.0',
+    ]);
+    assert.match(xml, /<title>Version 2\.0\.0: 1 resource type changed<\/title>/);
+    assert.match(xml, /<pubDate>Sun, 01 Feb 2026 00:00:00 GMT<\/pubDate>/);
+    assert.match(xml, /&lt;h2&gt;Modified resource types \(1\)&lt;\/h2&gt;/);
+    assert.match(xml, /href=&quot;https:\/\/cfn\.fyi\/version\/2\.0\.0#aws-test-thing&quot;/);
+    assert.match(xml, /No changes in this version\./);
+    assert.doesNotMatch(xml, /3\.0\.0/);
+  });
 });

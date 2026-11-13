@@ -5,6 +5,7 @@ import { assets } from '#app/assets.ts';
 import { Config } from '#app/config.ts';
 import type { Diff } from '#app/data/comparison.ts';
 import { confirmSubscription, parseAddress, requestSubscription } from '#app/data/email.ts';
+import { feedLength, versionFeed } from '#app/data/feed.ts';
 import { authorizeUrl, noStore, receiveEvent, saveInstallation } from '#app/data/slack.ts';
 import { EmailSubscribersTable } from '#app/database/email-subscribers.ts';
 import { ResourceChangesTable } from '#app/database/resource-changes.ts';
@@ -149,6 +150,11 @@ export default createController(routes, {
         '</urlset>',
       ].join('\n');
       return document(body, 'application/xml', 3600);
+    },
+    async feed() {
+      const rows = (await VersionsTable.listReady()).slice(-feedLength);
+      const changes = rows.length ? await ResourceChangesTable.listFromOrdinal(rows[0].ordinal) : [];
+      return document(versionFeed(rows, changes), 'application/rss+xml', 3600);
     },
     async index(context) {
       return changelog(context, await VersionsTable.listReady());

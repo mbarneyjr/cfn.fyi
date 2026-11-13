@@ -4,6 +4,7 @@ export const routes = route({
   assets: get('/assets/*path'),
   robots: get('/robots.txt'),
   sitemap: get('/sitemap.xml'),
+  feed: get('/feed.xml'),
   version: get('/version/*version'),
   resources: get('/resources'),
   resource: get('/resources/:type(/*version)'),

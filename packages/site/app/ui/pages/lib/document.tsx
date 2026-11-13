@@ -78,6 +78,7 @@ export function Document(handle: Handle<DocumentProps>) {
           <meta name="twitter:creator" content="@mbarneyjr" />
           <link rel="icon" type="image/svg+xml" href={faviconHref} />
           <link rel="apple-touch-icon" href={appleTouchIconHref} />
+          <link rel="alternate" type="application/rss+xml" title="cfn.fyi" href={routes.feed.href()} />
           <script type="application/ld+json">{JSON.stringify(structuredData)}</script>
           <ImportMap value={importMap} />
           {preloads.map((preloadHref) => (

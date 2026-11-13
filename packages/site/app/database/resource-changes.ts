@@ -1,4 +1,4 @@
-import { column as c, type TableRow, table } from 'remix/data-table';
+import { column as c, gte, type TableRow, table } from 'remix/data-table';
 import { statuses } from '#app/data/comparison.ts';
 import { DatabaseConnection, retryOnConflict } from './connection.ts';
 
@@ -31,6 +31,10 @@ export class ResourceChangesTable {
       .where({ ordinal, ...(resourceType && { resource_type: resourceType }) })
       .orderBy('resource_type', 'asc')
       .all();
+  }
+
+  static listFromOrdinal(ordinal: number) {
+    return DatabaseConnection.database.query(resourceChanges).where(gte('ordinal', ordinal)).all();
   }
 
   static async listOrdinals(resourceType: string) {

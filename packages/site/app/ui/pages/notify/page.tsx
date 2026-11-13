@@ -1,6 +1,8 @@
 import type { Handle } from 'remix/component';
+import { feedLength } from '#app/data/feed.ts';
 import { routes } from '#app/routes.ts';
-import { Document } from '#app/ui/pages/lib/document.tsx';
+import { Document, origin } from '#app/ui/pages/lib/document.tsx';
+import { CopyButton } from '#app/ui/pages/notify/public/copy-button.tsx';
 import { border, color, layout, space, text } from '#app/ui/public/styles.ts';
 
 export const slackOutcomes = ['installed', 'denied', 'invalid', 'failed'] as const;
@@ -71,6 +73,16 @@ export function NotifyPage(handle: Handle<NotifyPageProps>) {
               <a href={routes.slackInstall.href()} data-rmx-document>
                 Add to Slack
               </a>
+            </p>
+          </section>
+          <section mix={[layout.stack, space.gap2]}>
+            <h2 mix={[text.heading, border.rule]}>RSS</h2>
+            <p>Add the feed to a feed reader. It lists the {feedLength} most recent versions.</p>
+            <p mix={[layout.cluster, space.gap2]}>
+              <a href={routes.feed.href()} data-rmx-document>
+                {`${origin}${routes.feed.href()}`}
+              </a>
+              <CopyButton value={`${origin}${routes.feed.href()}`} />
             </p>
           </section>
         </div>
