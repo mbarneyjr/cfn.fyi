@@ -875,6 +875,36 @@ Resources:
       Threshold: 3600
       TreatMissingData: notBreaching
 
+  EmailBounceAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: IsProduction
+    Properties:
+      AlarmName: !Sub ${ApplicationName}-${EnvironmentName}-email-bounces
+      AlarmDescription: An email bounced. SES reviews the account at a 5 percent bounce rate and can pause sending at 10 percent
+      Namespace: AWS/SES
+      MetricName: Bounce
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      Threshold: 1
+      TreatMissingData: notBreaching
+
+  EmailComplaintAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: IsProduction
+    Properties:
+      AlarmName: !Sub ${ApplicationName}-${EnvironmentName}-email-complaints
+      AlarmDescription: A recipient marked an email as spam. SES reviews the account at a 0.1 percent complaint rate and can pause sending at 0.5 percent
+      Namespace: AWS/SES
+      MetricName: Complaint
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      Threshold: 1
+      TreatMissingData: notBreaching
+
 
 Outputs:
   SiteUrl:
