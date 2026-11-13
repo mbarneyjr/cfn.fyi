@@ -205,6 +205,16 @@ describe('changelog', () => {
     assert.match(await response.text(), /Sitemap: https:\/\/cfn\.fyi\/sitemap\.xml/);
   });
 
+  it('disallows crawlers in robots.txt outside prod and allows them in prod', async () => {
+    assert.match(await (await index(routes.robots.href())).text(), /^Disallow: \/$/m);
+    process.env.ENVIRONMENT_NAME = 'prod';
+    try {
+      assert.match(await (await index(routes.robots.href())).text(), /^Allow: \/$/m);
+    } finally {
+      delete process.env.ENVIRONMENT_NAME;
+    }
+  });
+
   it('serves a sitemap of every ready version', async () => {
     const response = await index(routes.sitemap.href());
     assert.equal(response.status, 200);

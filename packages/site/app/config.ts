@@ -40,6 +40,10 @@ const lambdaSchema = object({
   REBUILD_FUNCTION_NAME: optional(string()),
 });
 
+const environmentSchema = object({
+  ENVIRONMENT_NAME: optional(string()),
+});
+
 function load<Output>(name: string, schema: Schema<unknown, Output>) {
   const result = parseSafe(schema, process.env);
   if (result.success) return result.value;
@@ -109,6 +113,13 @@ export class Config {
       functionNames: {
         rebuildChanges: env.REBUILD_FUNCTION_NAME,
       },
+    };
+  }
+
+  static environment() {
+    const env = load('environment', environmentSchema);
+    return {
+      name: env.ENVIRONMENT_NAME,
     };
   }
 }

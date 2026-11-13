@@ -127,7 +127,8 @@ export default createController(routes, {
       return (await assets.fetch(context.request)) ?? new Response('Not Found', { status: 404 });
     },
     robots() {
-      const body = ['User-agent: *', 'Allow: /', '', `Sitemap: ${origin}${routes.sitemap.href()}`, ''].join('\n');
+      const rule = Config.environment().name === 'prod' ? 'Allow: /' : 'Disallow: /';
+      const body = ['User-agent: *', rule, '', `Sitemap: ${origin}${routes.sitemap.href()}`, ''].join('\n');
       return document(body, 'text/plain', 86400);
     },
     async sitemap() {

@@ -1,6 +1,7 @@
 import { css, type Handle, type RemixNode } from 'remix/component';
 import { ImportMap } from 'remix/component/server';
 import { assets } from '#app/assets.ts';
+import { Config } from '#app/config.ts';
 import { routes } from '#app/routes.ts';
 import { Footer } from '#app/ui/public/footer.tsx';
 import { Navbar } from '#app/ui/public/navbar.tsx';
@@ -9,7 +10,7 @@ import { themeCss, tokens } from '#app/ui/public/tokens.ts';
 
 const scriptEntry = await assets.getScriptEntry('app/ui/public/entry.ts');
 
-export const origin = 'https://cfn.fyi';
+export const origin = new URL(Config.notifications().siteUrl).origin;
 
 export interface DocumentProps {
   children?: RemixNode;
