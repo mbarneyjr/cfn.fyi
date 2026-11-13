@@ -1,9 +1,11 @@
 import * as assert from 'remix/assert';
 import { describe, it } from 'remix/test';
 
+import { type EmailMessage, SES } from '#app/aws/ses.ts';
 import { compare } from '#app/data/comparison.ts';
 import { versionMessages } from '#app/data/slack-messages.ts';
 import type { Specification } from '#app/data/specification.ts';
+import { emailSubscribers } from '#app/database/email-subscribers.ts';
 import { resourceChanges } from '#app/database/resource-changes.ts';
 import { resourceTypes } from '#app/database/resource-types.ts';
 import { slackInstallations } from '#app/database/slack-installations.ts';
@@ -173,5 +175,48 @@ describe('versionMessages', () => {
         .split('• ').length - 1,
       3000,
     );
+  });
+});
+
+describe('sendNotification for email', () => {
+  const emailDelivery: Delivery = { channel: 'email', subscriber: 'a@example.com', version: '2.0.0', ordinal: 2000000 };
+
+  async function setupEmail(t: { after(callback: () => unknown): void }) {
+    const db = await setup(t);
+    await db.createMany(emailSubscribers, [
+      { email: 'a@example.com', token: 'token-a', status: 'confirmed', requested_at: seen, confirmed_at: seen },
+      { email: 'b@example.com', token: 'token-b', status: 'pending', requested_at: seen },
+    ]);
+    return db;
+  }
+
+  it('sends one email with the changed types and a one-click unsubscribe header', async (t) => {
+    await setupEmail(t);
+    const sent: EmailMessage[] = [];
+    t.mock.method(SES, 'sendEmail', async (message: EmailMessage) => {
+      sent.push(message);
+    });
+    assert.equal(await sendNotification(emailDelivery, siteUrl), 'sent');
+    assert.equal(sent.length, 1);
+    const [message] = sent;
+    assert.equal(message.to, 'a@example.com');
+    assert.equal(message.subject, 'AWS CloudFormation resource specification 2.0.0');
+    assert.equal(message.headers?.['List-Unsubscribe'], '<https://dev.cfn.fyi/email/unsubscribe?token=token-a>');
+    assert.equal(message.headers?.['List-Unsubscribe-Post'], 'List-Unsubscribe=One-Click');
+    assert.match(message.html, /^<!DOCTYPE html><html/);
+    assert.match(message.html, /href="https:\/\/dev\.cfn\.fyi\/version\/2\.0\.0#aws-test-a"/);
+    assert.match(message.html, /@media \(prefers-color-scheme: dark\)/);
+    assert.doesNotMatch(message.html, /@layer|data-rmx-style/);
+    assert.match(message.text, /Modified resource types \(1\)\n- AWS::Test::B/);
+  });
+
+  it('sends at most once and only to a confirmed subscriber', async (t) => {
+    const db = await setupEmail(t);
+    const sendEmail = t.mock.method(SES, 'sendEmail', async () => {});
+    await sendNotification(emailDelivery, siteUrl);
+    assert.equal(await sendNotification(emailDelivery, siteUrl), 'skipped');
+    assert.equal(await sendNotification({ ...emailDelivery, subscriber: 'b@example.com' }, siteUrl), 'skipped');
+    assert.equal(sendEmail.mock.calls.length, 1);
+    assert.equal((await db.find(emailSubscribers, 'a@example.com'))?.notified_ordinal, 2000000);
   });
 });

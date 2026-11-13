@@ -37,11 +37,13 @@ export interface Specification {
 
 const bucketUrl = 'https://cfn-resource-specifications-us-east-1-prod.s3.us-east-1.amazonaws.com';
 
-const fileUrl = (version: string, folder = '') =>
-  `${bucketUrl}/${version}/${folder}CloudFormationResourceSpecification.json`;
+function fileUrl(version: string, folder = '') {
+  return `${bucketUrl}/${version}/${folder}CloudFormationResourceSpecification.json`;
+}
 
-export const ordinal = (version: string) =>
-  version.split('.').reduce((total, part) => total * 1000 + Number.parseInt(part, 10), 0);
+export function ordinal(version: string) {
+  return version.split('.').reduce((total, part) => total * 1000 + Number.parseInt(part, 10), 0);
+}
 
 export async function listSourceVersions() {
   const versions: string[] = [];
@@ -102,5 +104,6 @@ const specificationSchema: Schema<unknown, Specification> = object({
   PropertyTypes: record(string(), definitionSchema),
 });
 
-export const parseSpecification = (json: Uint8Array) =>
-  parse(specificationSchema, JSON.parse(Buffer.from(json).toString('utf8')));
+export function parseSpecification(json: Uint8Array) {
+  return parse(specificationSchema, JSON.parse(Buffer.from(json).toString('utf8')));
+}

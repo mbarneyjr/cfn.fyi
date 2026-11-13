@@ -5,7 +5,9 @@ import { border, color, layout, space, text } from '#app/ui/public/styles.ts';
 import type { Block, Changelog, Line, Mark, Segment } from './lines.ts';
 import { ExpandControls } from './public/expand-controls.tsx';
 
-const tone = (token: string, wash?: string) => css({ color: token, '--link-color': token, backgroundColor: wash });
+function tone(token: string, wash?: string) {
+  return css({ color: token, '--link-color': token, backgroundColor: wash });
+}
 
 const mutedTone = tone('var(--color-muted)');
 
@@ -76,7 +78,7 @@ export const invisible = css({ visibility: 'hidden' });
 
 export const row = css({ cursor: 'default', listStyle: 'none', '&::-webkit-details-marker': { display: 'none' } });
 
-export const summaryRow = css({ cursor: 'pointer', '&:hover': { backgroundColor: 'var(--color-sheet)' } });
+export const summaryRow = css({ cursor: 'pointer', '&:hover': { backgroundColor: 'var(--color-surface)' } });
 
 export const entryHeader = css({
   gap: 'var(--space-2)',
@@ -123,11 +125,11 @@ function EntryHeader(handle: Handle<{ block: Block; expandable: boolean; history
 const sheet = css({
   overflowX: 'auto',
   paddingBlock: 'var(--space-2)',
-  backgroundColor: 'var(--color-sheet)',
-  borderTop: 'var(--line-width) solid var(--color-line)',
+  backgroundColor: 'var(--color-surface)',
+  borderTop: 'var(--line-width) solid var(--color-border)',
   fontSize: 'var(--text-sm)',
   lineHeight: 'var(--leading-base)',
-  '--link-color': 'var(--color-ink)',
+  '--link-color': 'var(--color-foreground)',
   '& code': { display: 'block', width: 'max-content', minWidth: '100%', counterReset: 'line' },
   '& code > span': { display: 'block', paddingInlineEnd: 'var(--space-3)' },
   '& :target': { outline: 'var(--line-width) solid var(--color-brand)', outlineOffset: '-1px' },
@@ -139,7 +141,7 @@ const gutter = css({
   userSelect: 'none',
   marginInlineEnd: 'var(--space-2)',
   paddingInlineEnd: 'var(--space-2)',
-  borderInlineEnd: 'var(--line-width) solid var(--color-line)',
+  borderInlineEnd: 'var(--line-width) solid var(--color-border)',
   '&::before': {
     content: 'counter(line)',
     display: 'inline-block',
@@ -195,7 +197,9 @@ function YamlLine(handle: Handle<{ line: Line }>) {
 
 const sectionHeading = css({ flex: '1 1 var(--heading-min)' });
 
-const counter = (index: number) => String(index + 1).padStart(2, '0');
+function counter(index: number) {
+  return String(index + 1).padStart(2, '0');
+}
 
 export function ChangelogChanges(handle: Handle<{ changelog: Changelog; resourceView?: boolean }>) {
   return () => {

@@ -40,11 +40,27 @@ export interface Diff {
 
 const emptySpecification: Specification = { ResourceSpecificationVersion: '', ResourceTypes: {}, PropertyTypes: {} };
 
-const scopeOf = (key: string) => (key.includes('.') ? key.slice(0, key.indexOf('.')) : '');
-const sortedUnion = (a: object, b: object) => [...new Set([...Object.keys(a), ...Object.keys(b)])].sort();
-const isAlias = (definition: Definition) => !definition.Properties && Boolean(definition.Type);
-const fieldsOf = (specification: Specification, key: string) => specification.PropertyTypes[key]?.Properties ?? {};
-const header = (definition?: Definition) => definition && (({ Properties, Attributes, ...rest }) => rest)(definition);
+function scopeOf(key: string) {
+  return key.includes('.') ? key.slice(0, key.indexOf('.')) : '';
+}
+
+function sortedUnion(a: object, b: object) {
+  return [...new Set([...Object.keys(a), ...Object.keys(b)])].sort();
+}
+
+function isAlias(definition: Definition) {
+  return !definition.Properties && Boolean(definition.Type);
+}
+
+function fieldsOf(specification: Specification, key: string) {
+  return specification.PropertyTypes[key]?.Properties ?? {};
+}
+
+function header(definition?: Definition) {
+  if (!definition) return undefined;
+  const { Properties, Attributes, ...rest } = definition;
+  return rest;
+}
 
 function resolve(specification: Specification, scope: string, name: string) {
   const scoped = `${scope}.${name}`;
@@ -67,19 +83,25 @@ function shapeOf(specification: Specification, scope: string, property: Property
   return { type: key, href: definition.Documentation };
 }
 
-const state = (specification: Specification, scope: string, property: Property): State => ({
-  property,
-  shape: shapeOf(specification, scope, property),
-});
+function state(specification: Specification, scope: string, property: Property): State {
+  return { property, shape: shapeOf(specification, scope, property) };
+}
 
-export const typeName = (shape: Shape) => shape.primitive ?? shape.type?.slice(shape.type.indexOf('.') + 1) ?? '';
+export function typeName(shape: Shape) {
+  return shape.primitive ?? shape.type?.slice(shape.type.indexOf('.') + 1) ?? '';
+}
 
-const sameShape = (a: Shape, b: Shape) => a.container === b.container && typeName(a) === typeName(b);
+function sameShape(a: Shape, b: Shape) {
+  return a.container === b.container && typeName(a) === typeName(b);
+}
 
-const sameConstraints = (a: Property, b: Property) =>
-  a.Required === b.Required && a.UpdateType === b.UpdateType && a.DuplicatesAllowed === b.DuplicatesAllowed;
+function sameConstraints(a: Property, b: Property) {
+  return a.Required === b.Required && a.UpdateType === b.UpdateType && a.DuplicatesAllowed === b.DuplicatesAllowed;
+}
 
-export const expansion = (diff: PropertyDiff) => `${diff.before?.shape.type ?? ''}|${diff.after?.shape.type ?? ''}`;
+export function expansion(diff: PropertyDiff) {
+  return `${diff.before?.shape.type ?? ''}|${diff.after?.shape.type ?? ''}`;
+}
 
 class Comparison {
   readonly before: Specification;

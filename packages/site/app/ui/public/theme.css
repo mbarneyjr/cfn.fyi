@@ -1,47 +1,6 @@
 @layer theme {
   :root {
     color-scheme: light dark;
-
-    --color-paper: light-dark(hsl(210 33% 98%), hsl(216 58% 13%));
-    --color-sheet: light-dark(hsl(212 45% 95%), hsl(216 52% 17%));
-    --color-ink: light-dark(hsl(218 45% 13%), hsl(208 45% 93%));
-    --color-muted: light-dark(hsl(216 18% 40%), hsl(210 25% 70%));
-    --color-line: light-dark(hsl(213 38% 80%), hsl(212 42% 30%));
-    --color-brand: light-dark(hsl(216 88% 40%), hsl(197 95% 68%));
-    --color-added: light-dark(hsl(135 85% 15%), hsl(135 62% 64%));
-    --color-removed: light-dark(hsl(356 85% 29%), hsl(356 90% 78%));
-    --color-modified: light-dark(hsl(32 100% 19%), hsl(40 92% 64%));
-    --color-added-wash: light-dark(hsl(138 55% 75%), hsl(140 52% 23%));
-    --color-removed-wash: light-dark(hsl(356 78% 80%), hsl(354 55% 24%));
-    --color-modified-wash: light-dark(hsl(40 88% 72%), hsl(38 60% 20%));
-    --color-brand-wash: color-mix(in oklab, var(--color-brand) 12%, transparent);
-
-    --font-mono: "Ioskeley Mono", ui-monospace, monospace;
-    --text-xs: 0.6875rem;
-    --text-sm: 0.8125rem;
-    --text-base: 0.9375rem;
-    --text-lg: 1.125rem;
-    --text-xl: 1.75rem;
-    --leading-tight: 1.15;
-    --leading-base: 1.6;
-    --tracking-label: 0.14em;
-
-    --space-1: 0.25rem;
-    --space-2: 0.5rem;
-    --space-3: 1rem;
-    --space-4: 1.5rem;
-    --space-5: 3rem;
-
-    --line-width: 1px;
-
-    --content-width: 1040px;
-    --gutter: 16px;
-    --heading-min: 24ch;
-    --badge-size: 1.5em;
-    --line-number-width: 4ch;
-
-    --duration-fast: 120ms;
-    --easing-standard: ease-out;
   }
 
   :root[data-theme="light"] {
@@ -53,8 +12,8 @@
   }
 
   body {
-    background-color: var(--color-paper);
-    color: var(--color-ink);
+    background-color: var(--color-background);
+    color: var(--color-foreground);
     font-family: var(--font-mono);
     font-size: var(--text-base);
     line-height: var(--leading-base);
@@ -73,7 +32,7 @@
 
   button {
     appearance: none;
-    border: var(--line-width) solid var(--color-line);
+    border: var(--line-width) solid var(--color-border);
     border-radius: 0;
     background-color: transparent;
     color: var(--color-brand);
@@ -86,6 +45,14 @@
     background-color: var(--color-brand-wash);
   }
 
+  input {
+    border: var(--line-width) solid var(--color-border);
+    border-radius: 0;
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    padding: var(--space-1) var(--space-2);
+  }
+
   :focus-visible {
     outline: 2px solid var(--color-brand);
     outline-offset: 2px;
@@ -93,7 +60,7 @@
 
   ::selection {
     background-color: var(--color-brand);
-    color: var(--color-paper);
+    color: var(--color-background);
   }
 
   @media print {
@@ -105,9 +72,9 @@
     :root,
     :root[data-theme] {
       color-scheme: light;
-      --color-paper: hsl(0 0% 100%);
-      --color-sheet: hsl(0 0% 100%);
-      --gutter: 0;
+      --color-background: hsl(0 0% 100%);
+      --color-surface: hsl(0 0% 100%);
+      --space-gutter: 0;
       --space-3: 0.75rem;
       --space-4: 0.75rem;
       --space-5: 0.75rem;

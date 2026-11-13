@@ -7,8 +7,9 @@ export interface Neighbor {
   date?: string;
 }
 
-export const versionHref = (version: string, resourceType?: string) =>
-  resourceType ? routes.resource.href({ type: resourceType, version }) : routes.version.href({ version });
+export function versionHref(version: string, resourceType?: string) {
+  return resourceType ? routes.resource.href({ type: resourceType, version }) : routes.version.href({ version });
+}
 
 interface ChangelogNavigationProps {
   resourceType?: string;
@@ -28,7 +29,9 @@ const titleBlock = css({
   },
 });
 
-const area = (name: string) => css({ gridArea: name });
+function area(name: string) {
+  return css({ gridArea: name });
+}
 
 const dateSlot = css({ minBlockSize: '1lh' });
 
@@ -37,7 +40,7 @@ const select = css({
   font: 'inherit',
   fontSize: 'var(--text-lg)',
   fontWeight: 'bold',
-  color: 'var(--color-ink)',
+  color: 'var(--color-foreground)',
   backgroundColor: 'transparent',
   border: 'none',
   borderRadius: 0,
@@ -55,7 +58,7 @@ const select = css({
 });
 
 const cellLink = css({
-  '--link-color': 'var(--color-ink)',
+  '--link-color': 'var(--color-foreground)',
   '&:hover': { backgroundImage: 'linear-gradient(var(--color-brand-wash), var(--color-brand-wash))' },
 });
 
@@ -100,7 +103,7 @@ export const ChangelogNavigation = clientEntry(
           <label
             mix={[
               area('version'),
-              color.paper,
+              color.background,
               layout.stack,
               space.gap1,
               space.padBlock2,

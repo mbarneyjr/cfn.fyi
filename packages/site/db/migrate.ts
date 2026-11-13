@@ -65,6 +65,7 @@ try {
     if (SITE_FUNCTION_ROLE_ARN) {
       await grantRole(pool, 'cfnfyi_reader', SITE_FUNCTION_ROLE_ARN, ['select']);
       await pool.query('grant insert, update, delete on slack_installations to cfnfyi_reader');
+      await pool.query('grant insert, update, delete on email_subscribers to cfnfyi_reader');
     }
     if (EVENT_FUNCTION_ROLE_ARN)
       await grantRole(pool, 'cfnfyi_writer', EVENT_FUNCTION_ROLE_ARN, ['select', 'insert', 'update', 'delete']);

@@ -133,6 +133,11 @@ Resources:
               - Effect: Allow
                 Action: dsql:DbConnect
                 Resource: !GetAtt DatabaseCluster.ResourceArn
+              - Effect: Allow
+                Action: ses:SendEmail
+                Resource:
+                  - !Sub arn:${AWS::Partition}:ses:${AWS::Region}:${AWS::AccountId}:identity/*
+                  - !Sub arn:${AWS::Partition}:ses:${AWS::Region}:${AWS::AccountId}:configuration-set/${EmailConfigurationSet}
 
   SiteFunction:
     Type: AWS::Lambda::WebFunction
@@ -177,6 +182,8 @@ Resources:
           SLACK_CLIENT_SECRET: !Sub '{{resolve:secretsmanager:${SlackCredentials}:SecretString:ClientSecret}}'
           SLACK_SIGNING_SECRET: !Sub '{{resolve:secretsmanager:${SlackCredentials}:SecretString:SigningSecret}}'
           SLACK_SCOPES: !Join [',', !GetAtt SlackApp.BotScopes]
+          SITE_URL: !Sub https://${DomainName}
+          EMAIL_FROM_ADDRESS: !Sub cfn.fyi <notifications@${EmailIdentity}>
 
   SiteFunctionEndpoint:
     Type: AWS::Lambda::WebFunctionEndpoint
@@ -256,6 +263,13 @@ Resources:
           - PathPattern: /slack/events
             TargetOriginId: primary
             ViewerProtocolPolicy: https-only
+            AllowedMethods: [GET, HEAD, OPTIONS, PUT, PATCH, POST, DELETE]
+            CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad # caching disabled
+            OriginRequestPolicyId: b689b0a8-53d0-40ab-baf2-68738e2966ac # all viewer except host header
+          - PathPattern: /email/*
+            TargetOriginId: primary
+            ViewerProtocolPolicy: redirect-to-https
+            Compress: true
             AllowedMethods: [GET, HEAD, OPTIONS, PUT, PATCH, POST, DELETE]
             CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad # caching disabled
             OriginRequestPolicyId: b689b0a8-53d0-40ab-baf2-68738e2966ac # all viewer except host header
@@ -348,6 +362,11 @@ Resources:
                 Resource:
                   - !GetAtt VersionReadyQueue.Arn
                   - !GetAtt DeliveryQueue.Arn
+              - Effect: Allow
+                Action: ses:SendEmail
+                Resource:
+                  - !Sub arn:${AWS::Partition}:ses:${AWS::Region}:${AWS::AccountId}:identity/*
+                  - !Sub arn:${AWS::Partition}:ses:${AWS::Region}:${AWS::AccountId}:configuration-set/${EmailConfigurationSet}
 
   SynchronizeArchiveFunction:
     Type: AWS::Lambda::Function
@@ -490,6 +509,7 @@ Resources:
           DATABASE_ENDPOINT: !Sub ${DatabaseCluster.Identifier}.dsql.${AWS::Region}.on.aws
           DATABASE_USER: cfnfyi_writer
           SITE_URL: !Sub https://${DomainName}
+          EMAIL_FROM_ADDRESS: !Sub cfn.fyi <notifications@${EmailIdentity}>
 
   SendNotificationEventSourceMapping:
     Type: AWS::Lambda::EventSourceMapping
@@ -499,6 +519,58 @@ Resources:
       BatchSize: 1
       FunctionResponseTypes:
         - ReportBatchItemFailures
+
+  ProcessEmailFeedbackFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub ${ApplicationName}-${EnvironmentName}-process-email-feedback
+      Runtime: nodejs24.x
+      Architectures:
+        - arm64
+      Handler: packages/site/app/events/bus/process-email-feedback/handler.handler
+      Code:
+        S3Bucket: !Ref CodeBucket
+        S3Key: !Ref CodeKey
+        S3ObjectVersion: !Ref CodeVersion
+      Role: !GetAtt EventFunctionRole.Arn
+      MemorySize: 512
+      Timeout: 60
+      LoggingConfig:
+        LogFormat: JSON
+      Environment:
+        Variables:
+          NODE_ENV: production
+          NODE_OPTIONS: --import remix/node-tsx
+          ENVIRONMENT_NAME: !Ref EnvironmentName
+          DATABASE_ENDPOINT: !Sub ${DatabaseCluster.Identifier}.dsql.${AWS::Region}.on.aws
+          DATABASE_USER: cfnfyi_writer
+
+  EmailFeedbackRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: Bounce and complaint events of the email configuration set
+      EventPattern:
+        source:
+          - aws.ses
+        detail-type:
+          - Email Bounced
+          - Email Complaint Received
+        detail:
+          mail:
+            tags:
+              ses:configuration-set:
+                - !Ref EmailConfigurationSet
+      Targets:
+        - Id: process-email-feedback
+          Arn: !GetAtt ProcessEmailFeedbackFunction.Arn
+
+  ProcessEmailFeedbackPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref ProcessEmailFeedbackFunction
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt EmailFeedbackRule.Arn
 
   SchedulerRole:
     Type: AWS::IAM::Role
@@ -554,6 +626,106 @@ Resources:
         HostedZoneId: Z2FDTNDATAQYW2
       Name: !Ref DomainName
       HostedZoneId: !Ref HostedZoneId
+
+  EmailConfigurationSet:
+    Type: AWS::SES::ConfigurationSet
+    Properties:
+      Name: !Sub ${ApplicationName}-${EnvironmentName}
+      DeliveryOptions:
+        TlsPolicy: REQUIRE
+      ReputationOptions:
+        ReputationMetricsEnabled: true
+      SendingOptions:
+        SendingEnabled: true
+      SuppressionOptions:
+        SuppressedReasons:
+          - BOUNCE
+          - COMPLAINT
+
+  EmailFeedbackEventDestination:
+    Type: AWS::SES::ConfigurationSetEventDestination
+    Properties:
+      ConfigurationSetName: !Ref EmailConfigurationSet
+      EventDestination:
+        Name: feedback
+        Enabled: true
+        MatchingEventTypes:
+          - bounce
+          - complaint
+        EventBridgeDestination:
+          EventBusArn: !Sub arn:${AWS::Partition}:events:${AWS::Region}:${AWS::AccountId}:event-bus/default
+
+  EmailIdentity:
+    Type: AWS::SES::EmailIdentity
+    Properties:
+      EmailIdentity: !Ref DomainName
+      ConfigurationSetAttributes:
+        ConfigurationSetName: !Ref EmailConfigurationSet
+      DkimSigningAttributes:
+        NextSigningKeyLength: RSA_2048_BIT
+      MailFromAttributes:
+        MailFromDomain: !Sub mail.${DomainName}
+        BehaviorOnMxFailure: REJECT_MESSAGE
+
+  EmailDkimRecord1:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      Name: !GetAtt EmailIdentity.DkimDNSTokenName1
+      Type: CNAME
+      TTL: '1800'
+      ResourceRecords:
+        - !GetAtt EmailIdentity.DkimDNSTokenValue1
+
+  EmailDkimRecord2:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      Name: !GetAtt EmailIdentity.DkimDNSTokenName2
+      Type: CNAME
+      TTL: '1800'
+      ResourceRecords:
+        - !GetAtt EmailIdentity.DkimDNSTokenValue2
+
+  EmailDkimRecord3:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      Name: !GetAtt EmailIdentity.DkimDNSTokenName3
+      Type: CNAME
+      TTL: '1800'
+      ResourceRecords:
+        - !GetAtt EmailIdentity.DkimDNSTokenValue3
+
+  EmailMailFromMxRecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      Name: !Sub mail.${DomainName}
+      Type: MX
+      TTL: '1800'
+      ResourceRecords:
+        - !Sub 10 feedback-smtp.${AWS::Region}.amazonses.com
+
+  EmailMailFromSpfRecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      Name: !Sub mail.${DomainName}
+      Type: TXT
+      TTL: '1800'
+      ResourceRecords:
+        - '"v=spf1 include:amazonses.com ~all"'
+
+  EmailDmarcRecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      Name: !Sub _dmarc.${DomainName}
+      Type: TXT
+      TTL: '1800'
+      ResourceRecords:
+        - '"v=DMARC1; p=none"'
 
   SiteErrorRateAlarm:
     Type: AWS::CloudWatch::Alarm

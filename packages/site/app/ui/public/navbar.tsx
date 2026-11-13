@@ -4,7 +4,7 @@ import { border, color, layout, space, text } from './styles.ts';
 import { ThemeControl } from './theme-control.tsx';
 
 const mark = css({ width: '1.75em', height: '1.75em', strokeWidth: 2, fill: 'none' });
-const outline = css({ stroke: 'var(--color-line)' });
+const outline = css({ stroke: 'var(--color-border)' });
 const overlap = css({ fill: 'var(--color-brand-wash)', stroke: 'var(--color-brand)' });
 const tilde = css({ stroke: 'var(--color-brand)', strokeLinecap: 'square' });
 
@@ -25,7 +25,7 @@ export const Navbar = clientEntry(import.meta.url, function Navbar(handle: Handl
       <div mix={[layout.container, layout.row, space.gap3]}>
         <a href={routes.index.href()} mix={[layout.inlineRow, space.gap2, text.large, text.bold, text.noUnderline]}>
           <Logo />
-          <span mix={color.ink}>
+          <span mix={color.foreground}>
             cfn<span mix={color.brand}>.fyi</span>
           </span>
         </a>

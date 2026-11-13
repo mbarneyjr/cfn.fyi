@@ -5,7 +5,7 @@ const spread = css({ justifyContent: 'space-between' });
 
 export function Footer(_handle: Handle) {
   return () => (
-    <footer mix={[border.top, color.sheet, color.muted, space.padBlock3, text.small]}>
+    <footer mix={[border.top, color.surface, color.muted, space.padBlock3, text.small]}>
       <div mix={[layout.container, layout.cluster, space.gap2, spread]}>
         <p>
           Data from the public{' '}

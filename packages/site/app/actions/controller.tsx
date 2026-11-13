@@ -2,8 +2,11 @@ import { createCookie } from 'remix/cookie';
 import { createController } from 'remix/router';
 
 import { assets } from '#app/assets.ts';
+import { Config } from '#app/config.ts';
 import type { Diff } from '#app/data/comparison.ts';
+import { confirmSubscription, parseAddress, requestSubscription } from '#app/data/email.ts';
 import { authorizeUrl, noStore, receiveEvent, saveInstallation } from '#app/data/slack.ts';
+import { EmailSubscribersTable } from '#app/database/email-subscribers.ts';
 import { ResourceChangesTable } from '#app/database/resource-changes.ts';
 import { ResourceTypesTable } from '#app/database/resource-types.ts';
 import { type Version, VersionsTable } from '#app/database/versions.ts';
@@ -14,15 +17,23 @@ import { SlackWebApi } from '#app/slack/web-api.ts';
 import { render } from '#app/ui/pages/changelog/lines.ts';
 import { ChangelogPage } from '#app/ui/pages/changelog/page.tsx';
 import type { Neighbor } from '#app/ui/pages/changelog/public/navigation.tsx';
+import { EmailUnsubscribePage } from '#app/ui/pages/email/page.tsx';
 import { origin } from '#app/ui/pages/lib/document.tsx';
 import { NotFoundPage } from '#app/ui/pages/not-found/page.tsx';
-import { NotifyPage, type SlackOutcome, slackOutcomes } from '#app/ui/pages/notify/page.tsx';
+import {
+  type EmailOutcome,
+  emailOutcomes,
+  NotifyPage,
+  type SlackOutcome,
+  slackOutcomes,
+} from '#app/ui/pages/notify/page.tsx';
 import { type ResourceSummary, ResourcesPage } from '#app/ui/pages/resources/page.tsx';
 
-const document = (body: string, type: string, maxAge: number) =>
-  new Response(body, {
+function document(body: string, type: string, maxAge: number) {
+  return new Response(body, {
     headers: { 'Content-Type': `${type}; charset=utf-8`, 'Cache-Control': `public, max-age=0, s-maxage=${maxAge}` },
   });
+}
 
 const stateCookie = createCookie('slack_oauth_state', {
   path: routes.slackCallback.href(),
@@ -47,26 +58,26 @@ async function installSlack(context: AppContext): Promise<SlackOutcome> {
   }
 }
 
-async function slackCallback(context: AppContext) {
+function emailRedirect(outcome: EmailOutcome) {
   return new Response(null, {
     status: 303,
-    headers: {
-      ...noStore,
-      Location: `${routes.notify.href()}?slack=${await installSlack(context)}`,
-      'Set-Cookie': await stateCookie.serialize('', { maxAge: 0 }),
-    },
+    headers: { ...noStore, Location: `${routes.notify.href()}?email=${outcome}` },
   });
 }
 
 const pageHeaders = { 'Cache-Control': 'public, max-age=0, s-maxage=300' };
 
-const notFound = (context: AppContext) =>
-  context.render(<NotFoundPage path={context.url.pathname} />, { status: 404, headers: pageHeaders });
+function notFound(context: AppContext) {
+  return context.render(<NotFoundPage path={context.url.pathname} />, { status: 404, headers: pageHeaders });
+}
 
-const isoDate = (value: unknown) => (value ? new Date(value as string | Date).toISOString().slice(0, 10) : undefined);
+function isoDate(value: unknown) {
+  return value ? new Date(value as string | Date).toISOString().slice(0, 10) : undefined;
+}
 
-const neighbor = (row?: Version): Neighbor | undefined =>
-  row && { version: row.version, date: isoDate(row.published_at) };
+function neighbor(row?: Version): Neighbor | undefined {
+  return row && { version: row.version, date: isoDate(row.published_at) };
+}
 
 async function resourceSummaries() {
   const rows = await ResourceTypesTable.list();
@@ -161,10 +172,55 @@ export default createController(routes, {
     },
     notify(context) {
       const slack = slackOutcomes.find((outcome) => outcome === context.url.searchParams.get('slack'));
-      return context.render(<NotifyPage slack={slack} />, { headers: pageHeaders });
+      const email = emailOutcomes.find((outcome) => outcome === context.url.searchParams.get('email'));
+      return context.render(<NotifyPage slack={slack} email={email} />, { headers: pageHeaders });
     },
-    slackCallback,
-    slackEvents: (context) => receiveEvent(context.request),
+    async slackCallback(context) {
+      return new Response(null, {
+        status: 303,
+        headers: {
+          ...noStore,
+          Location: `${routes.notify.href()}?slack=${await installSlack(context)}`,
+          'Set-Cookie': await stateCookie.serialize('', { maxAge: 0 }),
+        },
+      });
+    },
+    slackEvents(context) {
+      return receiveEvent(context.request);
+    },
+    async emailSubscribe(context) {
+      const address = parseAddress((await context.request.formData()).get('email'));
+      if (!address) return emailRedirect('rejected');
+      try {
+        await requestSubscription(address, Config.notifications().siteUrl);
+      } catch (error) {
+        Logger.error('email subscription request failed', { error });
+        return emailRedirect('failed');
+      }
+      return emailRedirect('requested');
+    },
+    async emailConfirm(context) {
+      const token = context.url.searchParams.get('token');
+      return emailRedirect(token ? await confirmSubscription(token) : 'invalid');
+    },
+    emailUnsubscribeForm(context) {
+      const token = context.url.searchParams.get('token');
+      if (!token) return emailRedirect('invalid');
+      return context.render(
+        <EmailUnsubscribePage
+          path={routes.emailUnsubscribeForm.href()}
+          action={`${routes.emailUnsubscribe.href()}?${new URLSearchParams({ token })}`}
+        />,
+        { headers: noStore },
+      );
+    },
+    async emailUnsubscribe(context) {
+      const token = context.url.searchParams.get('token');
+      if (!token) return emailRedirect('invalid');
+      await EmailSubscribersTable.deleteByToken(token);
+      const oneClick = (await context.request.formData()).get('List-Unsubscribe') === 'One-Click';
+      return oneClick ? new Response(null, { headers: noStore }) : emailRedirect('unsubscribed');
+    },
     notFound,
   },
 });

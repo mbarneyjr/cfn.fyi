@@ -11,6 +11,10 @@ export const routes = route({
   slackInstall: get('/slack/install'),
   slackCallback: get('/slack/oauth/callback'),
   slackEvents: post('/slack/events'),
+  emailSubscribe: post('/email/subscribe'),
+  emailConfirm: get('/email/confirm'),
+  emailUnsubscribeForm: get('/email/unsubscribe'),
+  emailUnsubscribe: post('/email/unsubscribe'),
   index: get('/'),
   notFound: get('/*path'),
 });

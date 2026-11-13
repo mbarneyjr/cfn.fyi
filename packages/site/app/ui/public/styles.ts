@@ -6,7 +6,7 @@ export const layout = {
     width: '100%',
     maxWidth: 'var(--content-width)',
     marginInline: 'auto',
-    paddingInline: 'var(--gutter)',
+    paddingInline: 'var(--space-gutter)',
   }),
   /** One horizontal line of items, vertically centered. Items do not wrap. */
   row: css({ display: 'flex', alignItems: 'center' }),
@@ -17,15 +17,14 @@ export const layout = {
   /** Vertical list of items. The column can shrink below its content width. */
   stack: css({ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', alignContent: 'start' }),
   /**
-   * Title block grid: a hairline frame around the grid and between its children. Each direct child gets the paper
-   * background. Combine with `stack` or a local column template.
-   */
-  cells: css({
+   * Title block grid: a hairline frame around the grid and between its children. Each direct child gets the
+   * background color. Combine with `stack` or a local column template.
+   */ cells: css({
     display: 'grid',
     gap: 'var(--line-width)',
-    backgroundColor: 'var(--color-line)',
-    border: 'var(--line-width) solid var(--color-line)',
-    '& > *': { backgroundColor: 'var(--color-paper)' },
+    backgroundColor: 'var(--color-border)',
+    border: 'var(--line-width) solid var(--color-border)',
+    '& > *': { backgroundColor: 'var(--color-background)' },
   }),
   /** Pushes this item and all items after it to the end of a flex row. */
   pushEnd: css({ marginLeft: 'auto' }),
@@ -84,25 +83,30 @@ export const text = {
 };
 
 export const color = {
-  ink: css({ color: 'var(--color-ink)' }),
+  foreground: css({ color: 'var(--color-foreground)' }),
   muted: css({ color: 'var(--color-muted)' }),
   /** Drafting blue: structure, labels, and interactive elements. */
   brand: css({ color: 'var(--color-brand)' }),
   /** Change data that is removed. */
   removed: css({ color: 'var(--color-removed)' }),
-  paper: css({ backgroundColor: 'var(--color-paper)' }),
+  background: css({ backgroundColor: 'var(--color-background)' }),
   /** Filled areas: code sheets, the footer, row hover. */
-  sheet: css({ backgroundColor: 'var(--color-sheet)' }),
+  surface: css({ backgroundColor: 'var(--color-surface)' }),
 };
 
 export const border = {
-  top: css({ borderTop: 'var(--line-width) solid var(--color-line)' }),
-  bottom: css({ borderBottom: 'var(--line-width) solid var(--color-line)' }),
+  top: css({ borderTop: 'var(--line-width) solid var(--color-border)' }),
+  bottom: css({ borderBottom: 'var(--line-width) solid var(--color-border)' }),
   /** Lays the children out in a row and adds a hairline after them, to the end of the row. Used for `h2`. */
   rule: css({
     display: 'flex',
     alignItems: 'baseline',
     gap: 'var(--space-3)',
-    '&::after': { content: '""', flex: 1, alignSelf: 'center', borderTop: 'var(--line-width) solid var(--color-line)' },
+    '&::after': {
+      content: '""',
+      flex: 1,
+      alignSelf: 'center',
+      borderTop: 'var(--line-width) solid var(--color-border)',
+    },
   }),
 };

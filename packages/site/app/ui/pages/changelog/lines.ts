@@ -32,15 +32,23 @@ export interface Changelog {
 
 const statusMarks: Record<Status, Mark | undefined> = { added: '+', removed: '-', modified: undefined };
 
-const displayType = (shape: Shape) => `${shape.container ? `${shape.container} of ` : ''}${typeName(shape)}`;
+function displayType(shape: Shape) {
+  return `${shape.container ? `${shape.container} of ` : ''}${typeName(shape)}`;
+}
 
-const yesNo = (value?: boolean) => (value === undefined ? 'Not specified' : value ? 'Yes' : 'No');
+function yesNo(value?: boolean) {
+  return value === undefined ? 'Not specified' : value ? 'Yes' : 'No';
+}
+
 const updateTypes: Record<UpdateType, string> = {
   Mutable: 'No interruption',
   Immutable: 'Replacement',
   Conditional: 'Some interruptions',
 };
-const updateType = (value?: UpdateType) => (value === undefined ? 'Not specified' : (updateTypes[value] ?? value));
+
+function updateType(value?: UpdateType) {
+  return value === undefined ? 'Not specified' : (updateTypes[value] ?? value);
+}
 
 function typeChange(before: Shape, after: Shape) {
   const [a, b] = [displayType(before), displayType(after)];
@@ -59,8 +67,9 @@ function constraintChanges(before: Property, after: Property) {
   return changes;
 }
 
-const commentLines = (depth: number, mark: Mark | undefined, comments: string[]): Line[] =>
-  comments.map((text) => ({ depth, mark, comment: { text } }));
+function commentLines(depth: number, mark: Mark | undefined, comments: string[]): Line[] {
+  return comments.map((text) => ({ depth, mark, comment: { text } }));
+}
 
 function leafLines(head: Line, shape: Shape, mark?: Mark): Line[] {
   const value = { text: typeName(shape) };
@@ -72,21 +81,20 @@ function leafLines(head: Line, shape: Shape, mark?: Mark): Line[] {
   return [head, item];
 }
 
-const typeLine = (name: string, definition: Property, mark?: Mark): Line => ({
-  depth: 0,
-  mark,
-  key: { text: 'Type' },
-  value: { text: name, href: definition.Documentation },
-});
+function typeLine(name: string, definition: Property, mark?: Mark): Line {
+  return { depth: 0, mark, key: { text: 'Type' }, value: { text: name, href: definition.Documentation } };
+}
 
-const section = (name: string, body: Line[]): Line[] =>
-  body.length ? [{ depth: 0, key: { text: name } }, ...body] : [];
+function section(name: string, body: Line[]): Line[] {
+  return body.length ? [{ depth: 0, key: { text: name } }, ...body] : [];
+}
 
-export const slug = (text: string) =>
-  text
+export function slug(text: string) {
+  return text
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-|-$/g, '');
+}
 
 class Renderer {
   readonly blockId: string;

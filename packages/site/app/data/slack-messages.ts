@@ -8,7 +8,9 @@ const sectionLimit = 3000;
 const blockLimit = 50;
 const labels: Record<Status, string> = { added: 'Added', modified: 'Modified', removed: 'Removed' };
 
-const section = (text: string): SlackSectionBlock => ({ type: 'section', text: { type: 'mrkdwn', text } });
+function section(text: string): SlackSectionBlock {
+  return { type: 'section', text: { type: 'mrkdwn', text } };
+}
 
 function statusSections(status: Status, changes: ResourceChange[], versionUrl: URL) {
   const texts = [`*${labels[status]}*`];

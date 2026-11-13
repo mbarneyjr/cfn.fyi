@@ -35,8 +35,9 @@ function verifySignature(headers: Headers, body: string) {
   return expected.length === actual.length && timingSafeEqual(expected, actual);
 }
 
-const revokesBot = (event: EventPayload['event']) =>
-  event?.type === 'app_uninstalled' || (event?.type === 'tokens_revoked' && !!event.tokens?.bot?.length);
+function revokesBot(event: EventPayload['event']) {
+  return event?.type === 'app_uninstalled' || (event?.type === 'tokens_revoked' && !!event.tokens?.bot?.length);
+}
 
 export async function receiveEvent(request: Request) {
   const body = await request.text();

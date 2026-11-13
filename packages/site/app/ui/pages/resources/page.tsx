@@ -14,8 +14,8 @@ export interface ResourceSummary {
 const list = css({ listStyle: 'none', padding: 0, margin: 0 });
 
 const entry = css({
-  '--link-color': 'var(--color-ink)',
-  '&:hover': { backgroundColor: 'var(--color-sheet)' },
+  '--link-color': 'var(--color-foreground)',
+  '&:hover': { backgroundColor: 'var(--color-surface)' },
 });
 
 function services(resources: ResourceSummary[]) {

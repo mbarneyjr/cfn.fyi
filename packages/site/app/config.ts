@@ -1,14 +1,12 @@
 import { defaulted, object, optional, parseSafe, type Schema, string } from 'remix/data-schema';
-import { minLength, url } from 'remix/data-schema/checks';
-
-const required = () => string().pipe(minLength(1));
+import { url } from 'remix/data-schema/checks';
 
 const slackSchema = object({
   SLACK_AUTHORIZE_URL: string().pipe(url()),
-  SLACK_CLIENT_ID: required(),
-  SLACK_CLIENT_SECRET: required(),
-  SLACK_SIGNING_SECRET: required(),
-  SLACK_SCOPES: required(),
+  SLACK_CLIENT_ID: string(),
+  SLACK_CLIENT_SECRET: string(),
+  SLACK_SIGNING_SECRET: string(),
+  SLACK_SCOPES: string(),
   SLACK_REDIRECT_URI: optional(string().pipe(url())),
 });
 
@@ -18,24 +16,28 @@ const notificationsSchema = object({
   DELIVERY_QUEUE_URL: optional(string().pipe(url())),
 });
 
+const emailSchema = object({
+  EMAIL_FROM_ADDRESS: optional(string()),
+});
+
 const databaseSchema = object({
-  DATABASE_ENDPOINT: optional(required()),
-  DATABASE_URL: optional(required()),
-  DATABASE_USER: defaulted(required(), 'admin'),
-  AWS_REGION: optional(required()),
+  DATABASE_ENDPOINT: optional(string()),
+  DATABASE_URL: optional(string()),
+  DATABASE_USER: defaulted(string(), 'admin'),
+  AWS_REGION: optional(string()),
 });
 
 const archiveSchema = object({
-  ARCHIVE_BUCKET: optional(required()),
-  ARCHIVE_DIRECTORY: optional(required()),
+  ARCHIVE_BUCKET: optional(string()),
+  ARCHIVE_DIRECTORY: optional(string()),
 });
 
 const cloudFrontSchema = object({
-  DISTRIBUTION_ID: optional(required()),
+  DISTRIBUTION_ID: optional(string()),
 });
 
 const lambdaSchema = object({
-  REBUILD_FUNCTION_NAME: optional(required()),
+  REBUILD_FUNCTION_NAME: optional(string()),
 });
 
 function load<Output>(name: string, schema: Schema<unknown, Output>) {
@@ -66,6 +68,13 @@ export class Config {
         versionReady: env.VERSION_READY_QUEUE_URL,
         delivery: env.DELIVERY_QUEUE_URL,
       },
+    };
+  }
+
+  static email() {
+    const env = load('email', emailSchema);
+    return {
+      fromAddress: env.EMAIL_FROM_ADDRESS,
     };
   }
 

@@ -5,6 +5,7 @@ import { routes } from '#app/routes.ts';
 import { Footer } from '#app/ui/public/footer.tsx';
 import { Navbar } from '#app/ui/public/navbar.tsx';
 import { layout, space } from '#app/ui/public/styles.ts';
+import { themeCss, tokens } from '#app/ui/public/tokens.ts';
 
 const scriptEntry = await assets.getScriptEntry('app/ui/public/entry.ts');
 
@@ -56,8 +57,8 @@ export function Document(handle: Handle<DocumentProps>) {
             name="robots"
             content={noindex ? 'noindex, follow' : 'index, follow, max-image-preview:large, max-snippet:-1'}
           />
-          <meta name="theme-color" content="#f7f9fc" media="(prefers-color-scheme: light)" />
-          <meta name="theme-color" content="#0e2035" media="(prefers-color-scheme: dark)" />
+          <meta name="theme-color" content={tokens.color.background.light} media="(prefers-color-scheme: light)" />
+          <meta name="theme-color" content={tokens.color.background.dark} media="(prefers-color-scheme: dark)" />
           <meta property="og:type" content="website" />
           <meta property="og:locale" content="en_US" />
           <meta property="og:site_name" content="cfn.fyi" />
@@ -89,6 +90,7 @@ export function Document(handle: Handle<DocumentProps>) {
           ))}
           <link rel="stylesheet" href={resetCssHref} />
           <link rel="stylesheet" href={fontsCssHref} />
+          <style>{themeCss}</style>
           <link rel="stylesheet" href={themeCssHref} />
         </head>
         <body mix={css({ display: 'grid', gridTemplateRows: 'auto 1fr auto', gridTemplateColumns: 'minmax(0, 1fr)' })}>
