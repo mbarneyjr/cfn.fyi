@@ -11,7 +11,7 @@ import { resourceChanges } from '#app/database/resource-changes.ts';
 import { resourceTypes } from '#app/database/resource-types.ts';
 import { versions } from '#app/database/versions.ts';
 import { createTestDatabase } from '../../../../db/test-database.ts';
-import { invalidationPaths, rebuildChanges } from './handler.ts';
+import { rebuildChanges } from './handler.ts';
 
 const specification = (version: string, resources: string[]): Specification => ({
   ResourceSpecificationVersion: version,
@@ -113,19 +113,5 @@ describe('rebuildChanges', () => {
         ['AWS::Test::Kept', '1.0.0', 'added'],
       ],
     );
-  });
-});
-
-describe('invalidationPaths', () => {
-  it('includes the changed versions and their neighbors', () => {
-    const comparable = ['1.0.0', '2.0.0', '3.0.0', '4.0.0'].map((version) => ({ version })) as never;
-    assert.deepEqual(invalidationPaths(comparable, ['2.0.0']), [
-      '/',
-      '/sitemap.xml',
-      '/resources*',
-      '/version/1.0.0',
-      '/version/2.0.0',
-      '/version/3.0.0',
-    ]);
   });
 });

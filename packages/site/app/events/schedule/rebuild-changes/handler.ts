@@ -8,7 +8,7 @@ import { parseSpecification, type Specification } from '#app/data/specification.
 import { DatabaseConnection } from '#app/database/connection.ts';
 import { type ResourceChangeOperation, ResourceChangesTable } from '#app/database/resource-changes.ts';
 import { type ResourceType, ResourceTypesTable } from '#app/database/resource-types.ts';
-import { type Version, VersionsTable } from '#app/database/versions.ts';
+import { VersionsTable } from '#app/database/versions.ts';
 import { Logger } from '#app/logger.ts';
 
 interface RebuildOptions {
@@ -80,30 +80,17 @@ export async function rebuildChanges({ archive }: RebuildOptions) {
   const newest = comparable.at(-1);
   return {
     changed: [...changed],
-    comparable,
     latestReady: newest && ready.includes(newest) ? { version: newest.version, ordinal: newest.ordinal } : undefined,
     typesWritten: upserts.length + removals.length,
   };
 }
 
-export function invalidationPaths(comparable: Version[], changed: string[]) {
-  const paths = new Set(['/', '/sitemap.xml', '/resources*']);
-  const order = comparable.map((version) => version.version);
-  for (const version of changed) {
-    const index = order.indexOf(version);
-    for (const neighbor of [order[index - 1], version, order[index + 1]]) {
-      if (neighbor) paths.add(`/version/${neighbor}`);
-    }
-  }
-  return [...paths];
-}
-
 export async function handler(lambdaEvent: unknown) {
   Logger.info('lambda event received', { lambdaEvent });
-  const { changed, comparable, latestReady, typesWritten } = await rebuildChanges({ archive: createArchive() });
+  const { changed, latestReady, typesWritten } = await rebuildChanges({ archive: createArchive() });
   Logger.info('rebuilt changes', { changed, latestReady, typesWritten });
   if (latestReady) await SQS.sendMessage('versionReady', latestReady);
-  if (changed.length || typesWritten) await CloudFront.invalidate(invalidationPaths(comparable, changed));
+  if (changed.length || typesWritten) await CloudFront.invalidate(['/*']);
   return { changed };
 }
 
