@@ -62,7 +62,7 @@ export function ChangelogPage(handle: Handle<ChangelogPageProps>) {
                 </a>
               )}
               <h1 mix={[text.title, text.breakAnywhere]}>
-                {resourceType ?? (home ? 'What changed in CloudFormation' : `Version ${version}`)}
+                {resourceType ?? (home ? 'CloudFormation Changelog' : `Version ${version}`)}
               </h1>
               {resourceType ? (
                 <p mix={[color.muted, text.tabular]}>
@@ -82,11 +82,6 @@ export function ChangelogPage(handle: Handle<ChangelogPageProps>) {
                 )
               )}
             </div>
-            <p mix={color.muted}>
-              {resourceType
-                ? `Each version of the AWS CloudFormation resource specification that changed ${resourceType}, compared with the version before it.`
-                : 'cfn.fyi compares each version of the AWS CloudFormation resource specification with the version before it. See new resource types and changed properties as AWS releases them.'}
-            </p>
             <ul mix={[layout.cluster, space.gap3, text.small, legend]}>
               {statuses.map((status) => (
                 <li key={status} mix={[layout.row, space.gap2]}>
