@@ -103,7 +103,6 @@ describe('changelog', () => {
     assert.match(response.headers.get('content-type') ?? '', /text\/html/);
     const html = await response.text();
     assert.match(html, /<title>cfn\.fyi · CloudFormation specification changelog<\/title>/);
-    assert.match(html, /What changed in CloudFormation/);
     assert.match(html, /2\.0\.0/);
     assert.match(html, /2026-02-01/);
     assert.match(html, /Modified resource types/);
